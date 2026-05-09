@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs ls -lh)",
+      "Bash(grep -v \"\\\\.webp$\")",
+      "Bash(./gradlew dependencies *)",
+      "Bash(java -version)",
+      "Bash(javac -version)",
+      "Read(//usr/lib/jvm/**)",
+      "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew dependencies --configuration debugRuntimeClasspath)",
+      "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew :app:dependencies --configuration debugRuntimeClasspath)"
+    ]
+  }
+}
