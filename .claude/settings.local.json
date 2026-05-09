@@ -13,7 +13,8 @@
       "Bash(curl -L -o /home/amarpawar/AndroidStudioProjects/Devscroll/app/src/main/res/font/jetbrains_mono_medium.ttf \"https://github.com/JetBrains/JetBrainsMono/raw/master/fonts/ttf/JetBrainsMono-Medium.ttf\")",
       "Bash(curl -L -o /home/amarpawar/AndroidStudioProjects/Devscroll/app/src/main/res/font/jetbrains_mono_bold.ttf \"https://github.com/JetBrains/JetBrainsMono/raw/master/fonts/ttf/JetBrainsMono-Bold.ttf\")",
       "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew :app:compileDebugKotlin)",
-      "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew :app:kspDebugKotlin)"
+      "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew :app:kspDebugKotlin)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }
