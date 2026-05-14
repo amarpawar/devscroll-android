@@ -38,6 +38,23 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    flavorDimensions += "env"
+    productFlavors {
+        create("local") {
+            dimension = "env"
+            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.10:8080/\"")
+        }
+        create("dev") {
+            dimension = "env"
+            buildConfigField("String", "API_BASE_URL", "\"https://dev-api.devscroll.dev/\"")
+        }
+        create("prod") {
+            dimension = "env"
+            buildConfigField("String", "API_BASE_URL", "\"https://api.devscroll.dev/\"")
+        }
     }
 }
 

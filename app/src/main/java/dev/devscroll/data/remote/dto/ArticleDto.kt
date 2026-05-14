@@ -1,5 +1,6 @@
 package dev.devscroll.data.remote.dto
 
+import dev.devscroll.BuildConfig
 import dev.devscroll.data.local.entity.ArticleEntity
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -55,7 +56,7 @@ fun ArticleDto.toEntity(isRead: Boolean = false, isSaved: Boolean = false): Arti
         hitCount = hitCount,
         publishedOn = publishedMillis,
         readMinutes = readMinutes,
-        thumbnailUrl = thumbnailUrl,
+        thumbnailUrl = thumbnailUrl?.let { "${BuildConfig.API_BASE_URL}devscroll/api/thumbnails/$it" },
         title = title,
         url = url,
         isRead = isRead,

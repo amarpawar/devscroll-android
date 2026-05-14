@@ -8,6 +8,7 @@ import dev.devscroll.data.repository.ArticleRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -22,8 +23,7 @@ data class FeedUiState(
     val isLoadingMore: Boolean = false,
     val hasNext: Boolean = false,
     val error: String? = null,
-    val activeBlogFilter: Long? = null,
-    val activeCategoryFilter: String? = null,
+    val activeCategoryFilters: Set<String> = emptySet(),
     val sortOrder: SortOrder = SortOrder.NEWEST,
 )
 
@@ -39,22 +39,22 @@ class FeedViewModel @Inject constructor(
     private val repository: ArticleRepository,
 ) : ViewModel() {
 
-    private val blogFilter = MutableStateFlow<Long?>(null)
-    private val categoryFilter = MutableStateFlow<String?>(null)
+    private val categoryFilters = MutableStateFlow<Set<String>>(emptySet())
     private val sortOrder = MutableStateFlow(SortOrder.NEWEST)
     private val loadState = MutableStateFlow(LoadState())
     private var currentPage = 0
 
+    private val _newArticleCount = MutableStateFlow(0)
+    val newArticleCount: StateFlow<Int> = _newArticleCount.asStateFlow()
+
     val uiState: StateFlow<FeedUiState> = combine(
         repository.observeArticles(),
-        blogFilter,
-        categoryFilter,
+        categoryFilters,
         sortOrder,
         loadState,
-    ) { articles, blog, category, sort, load ->
+    ) { articles, filters, sort, load ->
         val filtered = articles
-            .filter { blog == null || it.blogId == blog }
-            .filter { category == null || category in it.categories }
+            .filter { filters.isEmpty() || it.categories.any { cat -> cat in filters } }
             .let { list ->
                 when (sort) {
                     SortOrder.NEWEST -> list.sortedByDescending { it.publishedOn }
@@ -67,8 +67,7 @@ class FeedViewModel @Inject constructor(
             isLoadingMore = load.isLoadingMore,
             hasNext = load.hasNext,
             error = load.error,
-            activeBlogFilter = blog,
-            activeCategoryFilter = category,
+            activeCategoryFilters = filters,
             sortOrder = sort,
         )
     }.stateIn(
@@ -84,16 +83,21 @@ class FeedViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             currentPage = 0
+            val existingIds = repository.getArticleIds()
             loadState.update { it.copy(isRefreshing = true, error = null) }
             repository.fetchArticles(page = 0)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
+                    val newCount = repository.getArticleIds().count { it !in existingIds }
+                    if (newCount > 0) _newArticleCount.value = newCount
                 }
                 .onFailure { e ->
                     loadState.update { it.copy(isRefreshing = false, error = e.message) }
                 }
         }
     }
+
+    fun clearNewArticleCount() { _newArticleCount.value = 0 }
 
     fun loadNextPage() {
         val state = loadState.value
@@ -112,27 +116,16 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    fun toggleSave(id: Long) {
-        viewModelScope.launch { repository.toggleSave(id) }
-    }
+    fun toggleSave(id: Long) { viewModelScope.launch { repository.toggleSave(id) } }
+    fun markRead(id: Long) { viewModelScope.launch { repository.markRead(id) } }
 
-    fun markRead(id: Long) {
-        viewModelScope.launch { repository.markRead(id) }
-    }
+    fun setFilter(tags: Set<String>) { categoryFilters.value = tags }
 
-    fun setBlogFilter(blogId: Long?) {
-        blogFilter.value = blogId
-    }
-
-    fun setCategoryFilter(slug: String?) {
-        categoryFilter.value = slug
-    }
+    fun clearFilter() { categoryFilters.value = emptySet() }
 
     fun toggleSort() {
         sortOrder.update { if (it == SortOrder.NEWEST) SortOrder.HOT else SortOrder.NEWEST }
     }
 
-    fun clearError() {
-        loadState.update { it.copy(error = null) }
-    }
+    fun clearError() { loadState.update { it.copy(error = null) } }
 }

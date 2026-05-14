@@ -52,6 +52,8 @@ class ArticleRepositoryImpl @Inject constructor(
             )
         }
 
+    override suspend fun getArticleIds(): Set<Long> = articleDao.getIds().toSet()
+
     override suspend fun markRead(id: Long) = articleDao.markRead(id)
 
     override suspend fun toggleSave(id: Long) {

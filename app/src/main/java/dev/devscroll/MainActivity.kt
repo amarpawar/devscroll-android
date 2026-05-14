@@ -6,8 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -18,7 +20,9 @@ import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
 import dev.devscroll.navigation.Screen
 import dev.devscroll.ui.components.BottomNavBar
+import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.feed.FeedScreen
+import dev.devscroll.ui.feed.FeedViewModel
 import dev.devscroll.ui.reader.ReaderScreen
 import dev.devscroll.ui.saved.SavedScreen
 import dev.devscroll.ui.search.SearchScreen
@@ -67,10 +71,22 @@ class MainActivity : ComponentActivity() {
                         startDestination = Screen.FEED,
                         modifier = Modifier.padding(innerPadding),
                     ) {
-                        composable(Screen.FEED) {
+                        composable(Screen.FEED) { backStackEntry ->
+                            val feedViewModel: FeedViewModel = hiltViewModel()
+                            val filterTagsList by backStackEntry.savedStateHandle
+                                .getStateFlow<ArrayList<String>>("filter_tags", arrayListOf())
+                                .collectAsState()
+                            LaunchedEffect(filterTagsList) {
+                                feedViewModel.setFilter(filterTagsList.toSet())
+                            }
                             FeedScreen(
+                                viewModel = feedViewModel,
                                 onArticleClick = { id -> navController.navigate(Screen.reader(id)) },
                                 onSearchClick = { navController.navigate(Screen.SEARCH) },
+                                onClearFilter = {
+                                    feedViewModel.clearFilter()
+                                    backStackEntry.savedStateHandle["filter_tags"] = arrayListOf<String>()
+                                },
                             )
                         }
                         composable(Screen.SAVED) {
@@ -82,9 +98,20 @@ class MainActivity : ComponentActivity() {
                             SourcesScreen()
                         }
                         composable(Screen.SEARCH) {
+                            val feedEntry = remember { navController.previousBackStackEntry }
+                            val currentTags by feedEntry
+                                ?.savedStateHandle
+                                ?.getStateFlow<ArrayList<String>>("filter_tags", arrayListOf())
+                                ?.collectAsState()
+                                ?: androidx.compose.runtime.mutableStateOf(arrayListOf())
                             SearchScreen(
                                 onArticleClick = { id -> navController.navigate(Screen.reader(id)) },
                                 onBack = { navController.popBackStack() },
+                                onApplyTags = { tags ->
+                                    navController.previousBackStackEntry
+                                        ?.savedStateHandle?.set("filter_tags", ArrayList(tags))
+                                },
+                                initialFilterTags = currentTags.toSet(),
                             )
                         }
                         composable(
