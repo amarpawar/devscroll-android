@@ -5,11 +5,14 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.devscroll.BuildConfig
+import dev.devscroll.data.remote.AuthInterceptor
+import dev.devscroll.data.remote.TokenAuthenticator
 import dev.devscroll.data.remote.DevscrollApiService
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -18,7 +21,15 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    fun provideOkHttpClient(
+        authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator
+    ): OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.MINUTES)
+        .readTimeout(10, TimeUnit.MINUTES)
+        .writeTimeout(10, TimeUnit.MINUTES)
+        .addInterceptor(authInterceptor)
+        .authenticator(tokenAuthenticator)
         .addInterceptor(
             HttpLoggingInterceptor().apply {
                 level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY

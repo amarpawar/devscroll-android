@@ -1,3 +1,6 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Devscroll</string>
+    <string name="google_web_client_id"  tools:ignore="TypographyDashes">1081264669999-5prb2hvd5pc9r7qj30ldfg91tbafjmgf.apps.googleusercontent.com</string>
+    <string name="facebook_app_id">999080069336840</string>
+    <string name="facebook_client_token">68223381e03e68b307bfcd6c1f7de4eb</string>
 </resources>

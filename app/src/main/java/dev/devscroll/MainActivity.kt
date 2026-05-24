@@ -20,6 +20,8 @@ import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
 import dev.devscroll.navigation.Screen
 import dev.devscroll.ui.components.BottomNavBar
+import dev.devscroll.data.local.AuthPreferences
+import dev.devscroll.data.model.User
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.feed.FeedScreen
 import dev.devscroll.ui.feed.FeedViewModel
@@ -37,12 +39,14 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var themePreferences: ThemePreferences
+    @Inject lateinit var authPreferences: AuthPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             val themeState by themePreferences.themeState.collectAsState(initial = ThemeState())
+            val userState by authPreferences.user.collectAsState(initial = null)
             DevscrollTheme(
                 darkTheme = themeState.isDark,
                 accentColor = themeState.accentColor,
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
                         if (currentRoute in Screen.bottomNavRoutes) {
                             BottomNavBar(
                                 currentRoute = currentRoute,
+                                user = userState,
                                 onNavigate = { route ->
                                     navController.navigate(route) {
                                         popUpTo(Screen.FEED) { saveState = true }

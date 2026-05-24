@@ -45,7 +45,7 @@ android {
     productFlavors {
         create("local") {
             dimension = "env"
-            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.8:8080/\"")
+            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.11:8080/\"")
         }
         create("dev") {
             dimension = "env"
@@ -97,6 +97,11 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+
+    // Google Sign-In & Credentials
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

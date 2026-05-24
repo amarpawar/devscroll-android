@@ -1,6 +1,8 @@
 package dev.devscroll.data.remote
 
-import dev.devscroll.data.remote.dto.ArticlesPageDto
+import dev.devscroll.data.remote.dto.*
+import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -32,4 +34,28 @@ interface DevscrollApiService {
         @Query("page") page: Int,
         @Query("size") size: Int = 20,
     ): ArticlesPageDto
+
+    @POST("devscroll/api/auth/register")
+    suspend fun registerWithEmail(@Body request: EmailSignUpRequest): TokenPair
+
+    @POST("devscroll/api/auth/login")
+    suspend fun loginWithEmail(@Body request: EmailSignInRequest): TokenPair
+
+    @POST("devscroll/api/auth/google")
+    suspend fun loginWithGoogle(@Body request: GoogleSignInRequest): TokenPair
+
+    @POST("devscroll/api/auth/facebook")
+    suspend fun loginWithFacebook(@Body request: FacebookSignInRequest): TokenPair
+
+    @POST("devscroll/api/auth/refresh")
+    suspend fun refreshSession(@Body request: RefreshRequest): TokenPair
+
+    @POST("devscroll/api/auth/logout")
+    suspend fun logout(@Body request: LogoutRequest): Response<Unit>
+
+    @POST("devscroll/api/auth/logout-all")
+    suspend fun logoutAll(): Response<Unit>
+
+    @GET("devscroll/api/users/me")
+    suspend fun getUserProfile(): UserProfileDto
 }
