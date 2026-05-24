@@ -48,9 +48,22 @@ interface ArticleDao {
     @Query("UPDATE articles SET isSaved = :saved WHERE articleId = :id")
     suspend fun setSaved(id: Long, saved: Boolean)
 
+    @Query("UPDATE articles SET isSaved = NOT isSaved WHERE articleId = :id")
+    suspend fun toggleSaved(id: Long)
+
     @Query("SELECT articleId FROM articles")
     suspend fun getIds(): List<Long>
 
     @Query("SELECT * FROM articles WHERE articleId = :id")
     suspend fun getById(id: Long): ArticleEntity?
+
+    @Query("""
+        DELETE FROM articles
+        WHERE articleId IN (
+            SELECT articleId FROM articles
+            ORDER BY publishedOn DESC
+            LIMIT :count
+        )
+    """)
+    suspend fun deleteNewest(count: Int)
 }

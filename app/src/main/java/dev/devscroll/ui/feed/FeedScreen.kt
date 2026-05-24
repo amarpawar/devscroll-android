@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.components.ArticleCard
 import dev.devscroll.ui.components.BlinkingEmptyState
+import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TopBar
 import dev.devscroll.ui.theme.ThemeViewModel
 import kotlinx.coroutines.launch
@@ -77,6 +77,10 @@ fun FeedScreen(
         if (isAtTop) viewModel.clearNewArticleCount()
     }
 
+    LaunchedEffect(isAtTop, uiState.pagesTrimmed) {
+        if (isAtTop && uiState.pagesTrimmed) viewModel.reloadEvictedPages()
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(
             isDark = themeState.isDark,
@@ -85,8 +89,8 @@ fun FeedScreen(
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-        // Active filter banner
-        if (uiState.activeCategoryFilters.isNotEmpty()) {
+        if (uiState.isSearchActive) {
+            // Search banner
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -94,25 +98,50 @@ fun FeedScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "$ filter --tag=${uiState.activeCategoryFilters.joinToString(", ") { "#$it" }}",
+                    text = "$ search --query=\"${uiState.searchQuery}\"",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { onClearFilter() }, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = { viewModel.clearSearch() }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Clear filter",
+                        contentDescription = "Clear search",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp),
                     )
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        }
+        } else {
+            // Active filter banner
+            if (uiState.activeCategoryFilters.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "$ filter --tag=${uiState.activeCategoryFilters.joinToString(", ") { "#$it" }}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { onClearFilter() }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Clear filter",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            }
 
-        // Sort row
-        Row(
+            // Sort row
+            Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -157,6 +186,7 @@ fun FeedScreen(
             )
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        } // end else (not search active)
 
         // Error
         if (uiState.error != null) {
@@ -168,6 +198,21 @@ fun FeedScreen(
             )
         }
 
+        if (uiState.articles.isNotEmpty() && uiState.isRefreshing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                TerminalLoader(
+                    labels = listOf("HANDSHAKE", "AUTH OK", "GET /feed"),
+                    modifier = Modifier.fillMaxWidth(0.6f),
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        }
+
         when {
             uiState.articles.isEmpty() && uiState.isRefreshing -> {
                 Box(
@@ -176,10 +221,12 @@ fun FeedScreen(
                         .fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
+                    TerminalLoader(
+                        labels = if (uiState.isSearchActive)
+                            listOf("SEARCH", "GET /search")
+                        else
+                            listOf("HANDSHAKE", "AUTH OK", "GET /feed"),
+                        modifier = Modifier.fillMaxWidth(0.6f),
                     )
                 }
             }
@@ -199,6 +246,7 @@ fun FeedScreen(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = { viewModel.refresh() },
                     modifier = Modifier.weight(1f),
+                    indicator = {},
                 ) {
                     LazyColumn(state = listState) {
                         items(uiState.articles, key = { it.id }) { article ->
@@ -220,10 +268,9 @@ fun FeedScreen(
                                         .padding(16.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary,
+                                    TerminalLoader(
+                                        labels = listOf("GET /feed"),
+                                        modifier = Modifier.fillMaxWidth(0.6f),
                                     )
                                 }
                             }
@@ -231,7 +278,7 @@ fun FeedScreen(
                     }
 
                     // New articles banner
-                    if (newArticleCount > 0 && !isAtTop) {
+                    if (newArticleCount > 0 && !isAtTop && !uiState.isSearchActive) {
                         val shape = RoundedCornerShape(2.dp)
                         Box(
                             modifier = Modifier

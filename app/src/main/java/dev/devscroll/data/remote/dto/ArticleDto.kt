@@ -2,6 +2,8 @@ package dev.devscroll.data.remote.dto
 
 import dev.devscroll.BuildConfig
 import dev.devscroll.data.local.entity.ArticleEntity
+import dev.devscroll.data.local.entity.SavedArticleEntity
+import dev.devscroll.data.local.entity.SearchArticleEntity
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -41,11 +43,7 @@ private fun isoFormat() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).a
 }
 
 fun ArticleDto.toEntity(isRead: Boolean = false, isSaved: Boolean = false): ArticleEntity {
-    val publishedMillis = try {
-        isoFormat().parse(publishedOn)?.time ?: System.currentTimeMillis()
-    } catch (e: Exception) {
-        System.currentTimeMillis()
-    }
+    val publishedMillis = parsedPublishedMillis()
     return ArticleEntity(
         articleId = articleId,
         authors = authors,
@@ -62,4 +60,43 @@ fun ArticleDto.toEntity(isRead: Boolean = false, isSaved: Boolean = false): Arti
         isRead = isRead,
         isSaved = isSaved,
     )
+}
+
+fun ArticleDto.toSavedEntity(savedAt: Long = System.currentTimeMillis()) = SavedArticleEntity(
+    articleId = articleId,
+    authors = authors,
+    blogId = blogId,
+    blogName = blogName,
+    categories = categories.map { it.slug },
+    description = description,
+    hitCount = hitCount,
+    publishedOn = parsedPublishedMillis(),
+    readMinutes = readMinutes,
+    thumbnailUrl = thumbnailUrl?.let { "${BuildConfig.API_BASE_URL}devscroll/api/thumbnails/$it" },
+    title = title,
+    url = url,
+    savedAt = savedAt,
+)
+
+fun ArticleDto.toSearchEntity(isRead: Boolean = false, isSaved: Boolean = false) = SearchArticleEntity(
+    articleId = articleId,
+    authors = authors,
+    blogId = blogId,
+    blogName = blogName,
+    categories = categories.map { it.slug },
+    description = description,
+    hitCount = hitCount,
+    publishedOn = parsedPublishedMillis(),
+    readMinutes = readMinutes,
+    thumbnailUrl = thumbnailUrl?.let { "${BuildConfig.API_BASE_URL}devscroll/api/thumbnails/$it" },
+    title = title,
+    url = url,
+    isRead = isRead,
+    isSaved = isSaved,
+)
+
+private fun ArticleDto.parsedPublishedMillis() = try {
+    isoFormat().parse(publishedOn)?.time ?: System.currentTimeMillis()
+} catch (e: Exception) {
+    System.currentTimeMillis()
 }

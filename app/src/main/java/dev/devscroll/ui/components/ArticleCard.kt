@@ -25,11 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import dev.devscroll.data.model.Article
 import kotlin.math.abs
 
@@ -111,14 +112,16 @@ fun ArticleCard(
                 }
             }
             if (article.thumbnailUrl != null) {
-                AsyncImage(
+                SubcomposeAsyncImage(
                     model = article.thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(72.dp),
+                    loading = { TerminalThumbnail(seed = article.id) },
+                    error = { TerminalThumbnail(seed = article.id) },
                 )
             } else {
-                LetterThumbnail(blogName = article.blogName)
+                TerminalThumbnail(seed = article.id)
             }
         }
 
@@ -156,25 +159,40 @@ fun ArticleCard(
 }
 
 @Composable
-private fun LetterThumbnail(blogName: String) {
-    val colors = listOf(
+private fun TerminalThumbnail(seed: Any) {
+    val symbols = listOf("//", "#!", "~/", "\$_", "&&", "||", ">>", "{}", "[]", "=>", "::", "!!")
+    val bgColors = listOf(
         Color(0xFF1A2A10), Color(0xFF0A2035), Color(0xFF2A1E08),
         Color(0xFF2D0A12), Color(0xFF1E1535), Color(0xFF0D1A2E), Color(0xFF0D2020),
     )
-    val bgColor = colors[abs(blogName.hashCode()) % colors.size]
-    val fgColor = blogBadgeColor(blogName)
+    val hash = abs(seed.hashCode())
+    val symbol = symbols[hash % symbols.size]
+    val bgColor = bgColors[hash % bgColors.size]
     Box(
         modifier = Modifier.size(72.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // Draw background
         androidx.compose.foundation.Canvas(modifier = Modifier.size(72.dp)) {
             drawRect(color = bgColor)
+            val stripeColor = Color(0xFF2A3A2A).copy(alpha = 0.6f)
+            val spacing = 10.dp.toPx()
+            clipRect {
+                var offset = -size.height
+                while (offset < size.width) {
+                    drawLine(
+                        color = stripeColor,
+                        start = androidx.compose.ui.geometry.Offset(offset, 0f),
+                        end = androidx.compose.ui.geometry.Offset(offset + size.height, size.height),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                    offset += spacing
+                }
+            }
         }
         Text(
-            text = blogName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-            style = MaterialTheme.typography.titleLarge,
-            color = fgColor,
+            text = symbol,
+            style = MaterialTheme.typography.titleSmall,
+            color = Color(0xFF4A8A5A),
             fontWeight = FontWeight.Bold,
         )
     }

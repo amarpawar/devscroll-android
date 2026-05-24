@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -52,6 +53,7 @@ fun SearchScreen(
     onArticleClick: (Long) -> Unit,
     onBack: () -> Unit,
     onApplyTags: (List<String>) -> Unit,
+    onSearch: (String) -> Unit = {},
     initialFilterTags: Set<String> = emptySet(),
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -60,6 +62,7 @@ fun SearchScreen(
     val topTags by viewModel.topTags.collectAsState()
     val sources by viewModel.sources.collectAsState()
     val focusRequester = remember { FocusRequester() }
+    var searchSubmitted by remember { mutableStateOf(false) }
     val isIdle = query.isBlank()
 
     // Local tag selection — initialized from current feed filter
@@ -112,6 +115,15 @@ fun SearchScreen(
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        if (query.isNotBlank() && !searchSubmitted) {
+                            searchSubmitted = true
+                            onSearch(query)
+                            onBack()
+                        }
+                    },
+                ),
                 decorationBox = { innerTextField ->
                     if (query.isEmpty()) {
                         Text(

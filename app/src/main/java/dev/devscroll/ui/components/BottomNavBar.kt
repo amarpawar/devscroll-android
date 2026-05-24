@@ -3,6 +3,7 @@ package dev.devscroll.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.DynamicFeed
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Source
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,7 @@ private val tabs = listOf(
     NavTab(Screen.FEED, "feed", Icons.Default.DynamicFeed),
     NavTab(Screen.SAVED, "saved", Icons.Default.Bookmarks),
     NavTab(Screen.SOURCES, "sources", Icons.Default.Source),
+    NavTab(Screen.PROFILE, "profile", Icons.Default.Person)
 )
 
 @Composable

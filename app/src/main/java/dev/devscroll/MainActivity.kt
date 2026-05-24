@@ -23,6 +23,7 @@ import dev.devscroll.ui.components.BottomNavBar
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.feed.FeedScreen
 import dev.devscroll.ui.feed.FeedViewModel
+import dev.devscroll.ui.profile.ProfileScreen
 import dev.devscroll.ui.reader.ReaderScreen
 import dev.devscroll.ui.saved.SavedScreen
 import dev.devscroll.ui.search.SearchScreen
@@ -97,20 +98,23 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.SOURCES) {
                             SourcesScreen()
                         }
+                        composable(Screen.PROFILE) {
+                            ProfileScreen()
+                        }
                         composable(Screen.SEARCH) {
-                            val feedEntry = remember { navController.previousBackStackEntry }
+                            val feedEntry = remember(navController.currentBackStackEntry) { navController.getBackStackEntry(Screen.FEED) }
+                            val feedViewModel: FeedViewModel = hiltViewModel(feedEntry)
                             val currentTags by feedEntry
-                                ?.savedStateHandle
-                                ?.getStateFlow<ArrayList<String>>("filter_tags", arrayListOf())
-                                ?.collectAsState()
-                                ?: androidx.compose.runtime.mutableStateOf(arrayListOf())
+                                .savedStateHandle
+                                .getStateFlow<ArrayList<String>>("filter_tags", arrayListOf())
+                                .collectAsState()
                             SearchScreen(
                                 onArticleClick = { id -> navController.navigate(Screen.reader(id)) },
                                 onBack = { navController.popBackStack() },
                                 onApplyTags = { tags ->
-                                    navController.previousBackStackEntry
-                                        ?.savedStateHandle?.set("filter_tags", ArrayList(tags))
+                                    feedEntry.savedStateHandle["filter_tags"] = ArrayList(tags)
                                 },
+                                onSearch = { query -> feedViewModel.search(query) },
                                 initialFilterTags = currentTags.toSet(),
                             )
                         }
