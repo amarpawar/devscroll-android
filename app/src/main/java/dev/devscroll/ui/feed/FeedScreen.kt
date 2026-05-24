@@ -60,6 +60,19 @@ fun FeedScreen(
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    
+    val onArticleClicked = remember(viewModel, onArticleClick) {
+        { article: dev.devscroll.data.model.Article ->
+            viewModel.markRead(article.id)
+            onArticleClick(article.id)
+        }
+    }
+    val onSaveClicked = remember(viewModel) {
+        { article: dev.devscroll.data.model.Article ->
+            viewModel.toggleSave(article.id)
+        }
+    }
+
     val isAtTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -148,28 +161,34 @@ fun FeedScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val annotatedText = buildAnnotatedString {
-                withStyle(
-                    style = SpanStyle(
-                        fontSize = MaterialTheme.typography.labelSmall.fontSize,
-                        fontWeight = MaterialTheme.typography.labelSmall.fontWeight,
-                        fontFamily = MaterialTheme.typography.labelSmall.fontFamily,
-                        letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing
-                    )
-                ) {
+            val labelSmall = MaterialTheme.typography.labelSmall
+            val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+            val primaryColor = MaterialTheme.colorScheme.primary
+
+            val annotatedText = remember(uiState.sortOrder, labelSmall, onSurfaceVariant, primaryColor) {
+                buildAnnotatedString {
                     withStyle(
                         style = SpanStyle(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = labelSmall.fontSize,
+                            fontWeight = labelSmall.fontWeight,
+                            fontFamily = labelSmall.fontFamily,
+                            letterSpacing = labelSmall.letterSpacing
                         )
                     ) {
-                        append("//sorted by ")
-                    }
-                    withStyle(
-                        style = SpanStyle(
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        append(if (uiState.sortOrder == SortOrder.NEWEST) "↓ newest" else "↑ hot")
+                        withStyle(
+                            style = SpanStyle(
+                                color = onSurfaceVariant,
+                            )
+                        ) {
+                            append("//sorted by ")
+                        }
+                        withStyle(
+                            style = SpanStyle(
+                                color = primaryColor
+                            )
+                        ) {
+                            append(if (uiState.sortOrder == SortOrder.NEWEST) "↓ newest" else "↑ hot")
+                        }
                     }
                 }
             }
@@ -249,19 +268,20 @@ fun FeedScreen(
                     indicator = {},
                 ) {
                     LazyColumn(state = listState) {
-                        items(uiState.articles, key = { it.id }) { article ->
+                        items(
+                            items = uiState.articles,
+                            key = { it.id },
+                            contentType = { "article" }
+                        ) { article ->
                             ArticleCard(
                                 article = article,
-                                onArticleClick = {
-                                    viewModel.markRead(article.id)
-                                    onArticleClick(article.id)
-                                },
-                                onSaveClick = { viewModel.toggleSave(article.id) },
+                                onArticleClick = onArticleClicked,
+                                onSaveClick = onSaveClicked,
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         }
                         if (uiState.isLoadingMore) {
-                            item {
+                            item(contentType = "loader") {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()

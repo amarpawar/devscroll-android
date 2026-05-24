@@ -19,6 +19,8 @@ import dev.devscroll.ui.components.BlinkingEmptyState
 import dev.devscroll.ui.components.TopBar
 import dev.devscroll.ui.theme.ThemeViewModel
 
+import androidx.compose.runtime.remember
+
 @Composable
 fun SavedScreen(
     onArticleClick: (Long) -> Unit,
@@ -27,6 +29,17 @@ fun SavedScreen(
 ) {
     val articles by viewModel.articles.collectAsState()
     val themeState by themeViewModel.themeState.collectAsState()
+
+    val onArticleClicked = remember(onArticleClick) {
+        { article: dev.devscroll.data.model.Article ->
+            onArticleClick(article.id)
+        }
+    }
+    val onSaveClicked = remember(viewModel) {
+        { article: dev.devscroll.data.model.Article ->
+            viewModel.toggleSave(article.id)
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(
@@ -41,11 +54,15 @@ fun SavedScreen(
             }
         } else {
             LazyColumn {
-                items(articles, key = { it.id }) { article ->
+                items(
+                    items = articles,
+                    key = { it.id },
+                    contentType = { "article" }
+                ) { article ->
                     ArticleCard(
                         article = article,
-                        onArticleClick = { onArticleClick(article.id) },
-                        onSaveClick = { viewModel.toggleSave(article.id) },
+                        onArticleClick = onArticleClicked,
+                        onSaveClick = onSaveClicked,
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }

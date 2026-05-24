@@ -12,7 +12,7 @@ import dev.devscroll.data.local.entity.SearchArticleEntity
 
 @Database(
     entities = [ArticleEntity::class, SavedArticleEntity::class, SearchArticleEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)

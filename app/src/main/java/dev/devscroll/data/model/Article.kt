@@ -1,5 +1,8 @@
 package dev.devscroll.data.model
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class Article(
     val id: Long,
     val authors: List<String>,

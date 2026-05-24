@@ -1,10 +1,17 @@
 package dev.devscroll.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import dev.devscroll.data.model.Article
 
-@Entity(tableName = "articles")
+@Entity(
+    tableName = "articles",
+    indices = [
+        Index(value = ["publishedOn"]),
+        Index(value = ["isSaved"])
+    ]
+)
 data class ArticleEntity(
     @PrimaryKey val articleId: Long,
     val authors: List<String>,

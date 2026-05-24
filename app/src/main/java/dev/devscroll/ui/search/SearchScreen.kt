@@ -63,6 +63,18 @@ fun SearchScreen(
     val sources by viewModel.sources.collectAsState()
     val focusRequester = remember { FocusRequester() }
     var searchSubmitted by remember { mutableStateOf(false) }
+
+    val onArticleClicked = remember(viewModel, onArticleClick) {
+        { article: dev.devscroll.data.model.Article ->
+            viewModel.markRead(article.id)
+            onArticleClick(article.id)
+        }
+    }
+    val onSaveClicked = remember(viewModel) {
+        { article: dev.devscroll.data.model.Article ->
+            viewModel.toggleSave(article.id)
+        }
+    }
     val isIdle = query.isBlank()
 
     // Local tag selection — initialized from current feed filter
@@ -222,14 +234,15 @@ fun SearchScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             }
             LazyColumn {
-                items(results, key = { it.id }) { article ->
+                items(
+                    items = results,
+                    key = { it.id },
+                    contentType = { "article" }
+                ) { article ->
                     ArticleCard(
                         article = article,
-                        onArticleClick = {
-                            viewModel.markRead(article.id)
-                            onArticleClick(article.id)
-                        },
-                        onSaveClick = { viewModel.toggleSave(article.id) },
+                        onArticleClick = onArticleClicked,
+                        onSaveClick = onSaveClicked,
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }

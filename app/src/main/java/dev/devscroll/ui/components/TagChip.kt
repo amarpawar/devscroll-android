@@ -40,5 +40,6 @@ fun TagChip(
         color = textColor,
         style = MaterialTheme.typography.labelSmall,
         modifier = baseModifier,
+        maxLines = 1,
     )
 }
