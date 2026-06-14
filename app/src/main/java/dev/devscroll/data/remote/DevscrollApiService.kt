@@ -18,6 +18,9 @@ interface DevscrollApiService {
         @Query("sortType") sortType: String = "NEWEST",
     ): ArticlesPageDto
 
+    @GET("devscroll/api/blog")
+    suspend fun getBlogs(): List<BlogDto>
+
     @GET("devscroll/api/articles/search")
     suspend fun searchArticles(
         @Query("query") query: String,
@@ -25,9 +28,11 @@ interface DevscrollApiService {
         @Query("pageSize") pageSize: Int = 20,
     ): ArticlesPageDto
 
-    // TODO: confirm endpoint paths with backend
-    @POST("devscroll/api/articles/{id}/toggle-save")
-    suspend fun toggleSave(@Path("id") articleId: Long)
+    @POST("devscroll/api/users/me/saved-articles/{article_id}")
+    suspend fun saveArticle(@Path("article_id") articleId: Long)
+
+    @DELETE("devscroll/api/users/me/saved-articles/{article_id}")
+    suspend fun unsaveArticle(@Path("article_id") articleId: Long)
 
     @GET("devscroll/api/articles/saved")
     suspend fun getSavedArticles(
@@ -58,4 +63,10 @@ interface DevscrollApiService {
 
     @GET("devscroll/api/users/me")
     suspend fun getUserProfile(): UserProfileDto
+
+    @POST("devscroll/api/users/me/unsubscriptions/{blogId}")
+    suspend fun unsubscribeBlog(@Path("blogId") blogId: Long)
+
+    @DELETE("devscroll/api/users/me/unsubscriptions/{blogId}")
+    suspend fun subscribeBlog(@Path("blogId") blogId: Long)
 }

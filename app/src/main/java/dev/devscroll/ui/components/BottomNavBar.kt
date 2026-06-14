@@ -8,6 +8,10 @@ import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Source
+import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.DynamicFeed
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Source
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -25,13 +29,18 @@ import coil.compose.SubcomposeAsyncImage
 import dev.devscroll.data.model.User
 import dev.devscroll.navigation.Screen
 
-private data class NavTab(val route: String, val label: String, val icon: ImageVector)
+private data class NavTab(
+    val route: String,
+    val label: String,
+    val filledIcon: ImageVector,
+    val outlinedIcon: ImageVector
+)
 
 private val tabs = listOf(
-    NavTab(Screen.FEED, "feed", Icons.Default.DynamicFeed),
-    NavTab(Screen.SAVED, "saved", Icons.Default.Bookmarks),
-    NavTab(Screen.SOURCES, "sources", Icons.Default.Source),
-    NavTab(Screen.PROFILE, "profile", Icons.Default.Person)
+    NavTab(Screen.FEED, "feed", Icons.Default.DynamicFeed, Icons.Outlined.DynamicFeed),
+    NavTab(Screen.SAVED, "saved", Icons.Default.Bookmarks, Icons.Outlined.Bookmarks),
+    NavTab(Screen.SOURCES, "sources", Icons.Default.Source, Icons.Outlined.Source),
+    NavTab(Screen.PROFILE, "profile", Icons.Default.Person, Icons.Outlined.Person)
 )
 
 @Composable
@@ -39,6 +48,7 @@ fun BottomNavBar(
     currentRoute: String?,
     user: User?,
     onNavigate: (String) -> Unit,
+    onActiveTabClick: (String) -> Unit = {},
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -53,9 +63,18 @@ fun BottomNavBar(
                 tab.label
             }
 
+            val isSelected = currentRoute == tab.route
+            val icon = if (isSelected) tab.filledIcon else tab.outlinedIcon
+
             NavigationBarItem(
-                selected = currentRoute == tab.route,
-                onClick = { onNavigate(tab.route) },
+                selected = isSelected,
+                onClick = {
+                    if (isSelected) {
+                        onActiveTabClick(tab.route)
+                    } else {
+                        onNavigate(tab.route)
+                    }
+                },
                 icon = {
                     if (isProfileTab && user != null && !user.pictureUrl.isNullOrBlank()) {
                         SubcomposeAsyncImage(
@@ -67,14 +86,14 @@ fun BottomNavBar(
                                 .border(1.dp, MaterialTheme.colorScheme.primary, CircleShape),
                             contentScale = ContentScale.Crop,
                             loading = {
-                                Icon(tab.icon, contentDescription = tab.label)
+                                Icon(icon, contentDescription = tab.label)
                             },
                             error = {
-                                Icon(tab.icon, contentDescription = tab.label)
+                                Icon(icon, contentDescription = tab.label)
                             }
                         )
                     } else {
-                        Icon(tab.icon, contentDescription = tab.label)
+                        Icon(icon, contentDescription = tab.label)
                     }
                 },
                 label = {

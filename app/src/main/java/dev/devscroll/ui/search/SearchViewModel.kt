@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.devscroll.data.model.Article
 import dev.devscroll.data.model.Source
+import dev.devscroll.data.model.User
 import dev.devscroll.data.repository.ArticleRepository
+import dev.devscroll.data.repository.AuthRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,7 +20,15 @@ import javax.inject.Inject
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val repository: ArticleRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
+
+    val userState: StateFlow<User?> = authRepository.userState
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
+        )
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query

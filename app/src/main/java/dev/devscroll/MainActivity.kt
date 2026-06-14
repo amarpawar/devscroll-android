@@ -5,10 +5,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.navigation.NavBackStackEntry
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
@@ -23,6 +34,10 @@ import dev.devscroll.ui.components.BottomNavBar
 import dev.devscroll.data.local.AuthPreferences
 import dev.devscroll.data.model.User
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import dev.devscroll.data.local.AppDatabase
 import dev.devscroll.ui.feed.FeedScreen
 import dev.devscroll.ui.feed.FeedViewModel
 import dev.devscroll.ui.profile.ProfileScreen
@@ -40,9 +55,16 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var themePreferences: ThemePreferences
     @Inject lateinit var authPreferences: AuthPreferences
+    @Inject lateinit var appDatabase: AppDatabase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Clear Room DB on app process start to keep caching session-only
+        lifecycleScope.launch(Dispatchers.IO) {
+            appDatabase.clearAllTables()
+        }
+
         enableEdgeToEdge()
         setContent {
             val themeState by themePreferences.themeState.collectAsState(initial = ThemeState())
@@ -54,6 +76,9 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val currentEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = currentEntry?.destination?.route
+
+                var feedTabClickTrigger by remember { androidx.compose.runtime.mutableStateOf(0L) }
+                var savedTabClickTrigger by remember { androidx.compose.runtime.mutableStateOf(0L) }
 
                 Scaffold(
                     bottomBar = {
@@ -68,6 +93,12 @@ class MainActivity : ComponentActivity() {
                                         restoreState = true
                                     }
                                 },
+                                onActiveTabClick = { route ->
+                                    when (route) {
+                                        Screen.FEED -> feedTabClickTrigger = System.currentTimeMillis()
+                                        Screen.SAVED -> savedTabClickTrigger = System.currentTimeMillis()
+                                    }
+                                }
                             )
                         }
                     },
@@ -75,7 +106,120 @@ class MainActivity : ComponentActivity() {
                     NavHost(
                         navController = navController,
                         startDestination = Screen.FEED,
-                        modifier = Modifier.padding(innerPadding),
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .pointerInput(currentRoute) {
+                                if (currentRoute in Screen.bottomNavRoutes) {
+                                    var totalDrag = 0f
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { totalDrag = 0f },
+                                        onDragEnd = {
+                                            val swipeThreshold = 80f
+                                            if (totalDrag < -swipeThreshold) {
+                                                navigateToAdjacentTab(navController, currentRoute, next = true)
+                                            } else if (totalDrag > swipeThreshold) {
+                                                navigateToAdjacentTab(navController, currentRoute, next = false)
+                                            }
+                                        },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            totalDrag += dragAmount
+                                        }
+                                    )
+                                }
+                            },
+                        enterTransition = {
+                            val initialRoute = initialState.destination.route
+                            val targetRoute = targetState.destination.route
+                            val tabRoutes = listOf(Screen.FEED, Screen.SAVED, Screen.SOURCES, Screen.PROFILE)
+                            val initialIndex = tabRoutes.indexOf(initialRoute)
+                            val targetIndex = tabRoutes.indexOf(targetRoute)
+                            
+                            if (initialIndex != -1 && targetIndex != -1) {
+                                if (targetIndex > initialIndex) {
+                                    slideIntoContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Left,
+                                        animationSpec = tween(300)
+                                    )
+                                } else {
+                                    slideIntoContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Right,
+                                        animationSpec = tween(300)
+                                    )
+                                }
+                            } else {
+                                fadeIn(animationSpec = tween(300))
+                            }
+                        },
+                        exitTransition = {
+                            val initialRoute = initialState.destination.route
+                            val targetRoute = targetState.destination.route
+                            val tabRoutes = listOf(Screen.FEED, Screen.SAVED, Screen.SOURCES, Screen.PROFILE)
+                            val initialIndex = tabRoutes.indexOf(initialRoute)
+                            val targetIndex = tabRoutes.indexOf(targetRoute)
+                            
+                            if (initialIndex != -1 && targetIndex != -1) {
+                                if (targetIndex > initialIndex) {
+                                    slideOutOfContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Left,
+                                        animationSpec = tween(300)
+                                    )
+                                } else {
+                                    slideOutOfContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Right,
+                                        animationSpec = tween(300)
+                                    )
+                                }
+                            } else {
+                                fadeOut(animationSpec = tween(300))
+                            }
+                        },
+                        popEnterTransition = {
+                            val initialRoute = initialState.destination.route
+                            val targetRoute = targetState.destination.route
+                            val tabRoutes = listOf(Screen.FEED, Screen.SAVED, Screen.SOURCES, Screen.PROFILE)
+                            val initialIndex = tabRoutes.indexOf(initialRoute)
+                            val targetIndex = tabRoutes.indexOf(targetRoute)
+                            
+                            if (initialIndex != -1 && targetIndex != -1) {
+                                if (targetIndex > initialIndex) {
+                                    slideIntoContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Left,
+                                        animationSpec = tween(300)
+                                    )
+                                } else {
+                                    slideIntoContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Right,
+                                        animationSpec = tween(300)
+                                    )
+                                }
+                            } else {
+                                fadeIn(animationSpec = tween(300))
+                            }
+                        },
+                        popExitTransition = {
+                            val initialRoute = initialState.destination.route
+                            val targetRoute = targetState.destination.route
+                            val tabRoutes = listOf(Screen.FEED, Screen.SAVED, Screen.SOURCES, Screen.PROFILE)
+                            val initialIndex = tabRoutes.indexOf(initialRoute)
+                            val targetIndex = tabRoutes.indexOf(targetRoute)
+                            
+                            if (initialIndex != -1 && targetIndex != -1) {
+                                if (targetIndex > initialIndex) {
+                                    slideOutOfContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Left,
+                                        animationSpec = tween(300)
+                                    )
+                                } else {
+                                    slideOutOfContainer(
+                                        AnimatedContentTransitionScope.SlideDirection.Right,
+                                        animationSpec = tween(300)
+                                    )
+                                }
+                            } else {
+                                fadeOut(animationSpec = tween(300))
+                            }
+                        }
                     ) {
                         composable(Screen.FEED) { backStackEntry ->
                             val feedViewModel: FeedViewModel = hiltViewModel()
@@ -93,15 +237,40 @@ class MainActivity : ComponentActivity() {
                                     feedViewModel.clearFilter()
                                     backStackEntry.savedStateHandle["filter_tags"] = arrayListOf<String>()
                                 },
+                                onSignInClick = {
+                                    navController.navigate(Screen.PROFILE) {
+                                        popUpTo(Screen.FEED) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                tabClickTrigger = feedTabClickTrigger,
                             )
                         }
                         composable(Screen.SAVED) {
                             SavedScreen(
                                 onArticleClick = { id -> navController.navigate(Screen.reader(id)) },
+                                onSignInClick = {
+                                    navController.navigate(Screen.PROFILE) {
+                                        popUpTo(Screen.FEED) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                tabClickTrigger = savedTabClickTrigger,
                             )
                         }
                         composable(Screen.SOURCES) {
-                            SourcesScreen()
+                            SourcesScreen(
+                                onSearchClick = { navController.navigate(Screen.SEARCH) },
+                                onSignInClick = {
+                                    navController.navigate(Screen.PROFILE) {
+                                        popUpTo(Screen.FEED) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
                         }
                         composable(Screen.PROFILE) {
                             ProfileScreen()
@@ -121,6 +290,13 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onSearch = { query -> feedViewModel.search(query) },
                                 initialFilterTags = currentTags.toSet(),
+                                onSignInClick = {
+                                    navController.navigate(Screen.PROFILE) {
+                                        popUpTo(Screen.FEED) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
                             )
                         }
                         composable(
@@ -133,10 +309,42 @@ class MainActivity : ComponentActivity() {
                             ReaderScreen(
                                 articleId = articleId,
                                 onBack = { navController.popBackStack() },
+                                onSignInClick = {
+                                    navController.navigate(Screen.PROFILE) {
+                                        popUpTo(Screen.FEED) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
                             )
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private fun navigateToAdjacentTab(
+        navController: androidx.navigation.NavHostController,
+        currentRoute: String?,
+        next: Boolean
+    ) {
+        val tabRoutes = listOf(
+            Screen.FEED,
+            Screen.SAVED,
+            Screen.SOURCES,
+            Screen.PROFILE
+        )
+        val currentIndex = tabRoutes.indexOf(currentRoute)
+        if (currentIndex == -1) return
+
+        val newIndex = if (next) currentIndex + 1 else currentIndex - 1
+        if (newIndex in tabRoutes.indices) {
+            val targetRoute = tabRoutes[newIndex]
+            navController.navigate(targetRoute) {
+                popUpTo(Screen.FEED) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
             }
         }
     }

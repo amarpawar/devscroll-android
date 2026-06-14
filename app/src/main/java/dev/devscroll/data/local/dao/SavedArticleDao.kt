@@ -18,6 +18,9 @@ interface SavedArticleDao {
     @Query("DELETE FROM saved_articles WHERE articleId = :id")
     suspend fun delete(id: Long)
 
+    @Query("DELETE FROM saved_articles")
+    suspend fun clearAll()
+
     @Query("SELECT * FROM saved_articles ORDER BY savedAt DESC")
     fun observeAll(): Flow<List<SavedArticleEntity>>
 

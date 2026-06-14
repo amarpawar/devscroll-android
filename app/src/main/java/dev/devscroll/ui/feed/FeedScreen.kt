@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,13 +40,34 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.components.ArticleCard
 import dev.devscroll.ui.components.BlinkingEmptyState
 import dev.devscroll.ui.components.TerminalLoader
+import dev.devscroll.ui.components.TerminalLoadMore
 import dev.devscroll.ui.components.TopBar
+import dev.devscroll.ui.components.TerminalToast
 import dev.devscroll.ui.theme.ThemeViewModel
+import dev.devscroll.ui.PaginationConfig
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,12 +75,34 @@ fun FeedScreen(
     onArticleClick: (Long) -> Unit,
     onSearchClick: () -> Unit,
     onClearFilter: () -> Unit = {},
+    onSignInClick: () -> Unit = {},
+    tabClickTrigger: Long = 0L,
     viewModel: FeedViewModel = hiltViewModel(),
     themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val themeState by themeViewModel.themeState.collectAsState()
-    val newArticleCount by viewModel.newArticleCount.collectAsState()
+    val user by viewModel.userState.collectAsState()
+
+    var showAuthToast by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showAuthToast) {
+        if (showAuthToast) {
+            kotlinx.coroutines.delay(2500.milliseconds)
+            showAuthToast = false
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
+    val cursorAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 530, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "cursorAlpha",
+    )
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -67,9 +113,13 @@ fun FeedScreen(
             onArticleClick(article.id)
         }
     }
-    val onSaveClicked = remember(viewModel) {
+    val onSaveClicked = remember(viewModel, user) {
         { article: dev.devscroll.data.model.Article ->
-            viewModel.toggleSave(article.id)
+            if (user == null) {
+                showAuthToast = true
+            } else {
+                viewModel.toggleSave(article.id)
+            }
         }
     }
 
@@ -82,19 +132,22 @@ fun FeedScreen(
         }
     }
 
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) viewModel.loadNextPage()
+    LaunchedEffect(shouldLoadMore, uiState.isBatchLimitReached) {
+        if (shouldLoadMore && !uiState.isBatchLimitReached) {
+            viewModel.loadNextPage()
+        }
     }
 
-    LaunchedEffect(isAtTop) {
-        if (isAtTop) viewModel.clearNewArticleCount()
+
+    LaunchedEffect(tabClickTrigger) {
+        if (tabClickTrigger > 0L) {
+            listState.animateScrollToItem(0)
+            viewModel.resetAndRefresh()
+        }
     }
 
-    LaunchedEffect(isAtTop, uiState.pagesTrimmed) {
-        if (isAtTop && uiState.pagesTrimmed) viewModel.reloadEvictedPages()
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
         TopBar(
             isDark = themeState.isDark,
             onThemeToggle = { themeViewModel.toggleDark() },
@@ -195,7 +248,10 @@ fun FeedScreen(
             Text(
                 text = annotatedText,
                 modifier = Modifier
-                    .clickable { viewModel.toggleSort() }
+                    .clickable {
+                        viewModel.toggleSort()
+                        scope.launch { listState.animateScrollToItem(0) }
+                    }
                     .padding(4.dp),
             )
             Text(
@@ -295,33 +351,62 @@ fun FeedScreen(
                                 }
                             }
                         }
-                    }
 
-                    // New articles banner
-                    if (newArticleCount > 0 && !isAtTop && !uiState.isSearchActive) {
-                        val shape = RoundedCornerShape(2.dp)
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = 8.dp),
-                        ) {
-                            Text(
-                                text = "↑ $newArticleCount new",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .clip(shape)
-                                    .border(1.dp, MaterialTheme.colorScheme.primary, shape)
-                                    .clickable {
-                                        viewModel.clearNewArticleCount()
-                                        scope.launch { listState.animateScrollToItem(0) }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                            )
+                        if (uiState.isBatchLimitReached && uiState.hasNext) {
+                            item(contentType = "batch_loader") {
+                                Box(modifier = Modifier.padding(16.dp)) {
+                                    TerminalLoadMore(
+                                        itemCount = PaginationConfig.maxItemsPerBatch,
+                                        onClick = {
+                                            scope.launch {
+                                                listState.scrollToItem(0)
+                                            }
+                                            viewModel.loadNextBatch()
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
+
                 }
             }
         }
     }
+
+    // Dimming Scrim behind the toast
+    if (showAuthToast) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) {
+                    showAuthToast = false
+                }
+        )
+    }
+
+    // Terminal Toast overlay matching screenshot design
+    AnimatedVisibility(
+        visible = showAuthToast,
+        enter = fadeIn(animationSpec = tween(250)) + slideInVertically(initialOffsetY = { it }, animationSpec = tween(250)),
+        exit = fadeOut(animationSpec = tween(250)) + slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250)),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 16.dp, vertical = 24.dp)
+    ) {
+        TerminalToast(
+            actionLabel = "save articles",
+            commandLabel = "save",
+            cursorAlpha = cursorAlpha,
+            modifier = Modifier.clickable {
+                showAuthToast = false
+                onSignInClick()
+            }
+        )
+    }
+}
 }

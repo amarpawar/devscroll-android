@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import dev.devscroll.data.local.AppDatabase
 import dev.devscroll.data.local.dao.ArticleDao
+import dev.devscroll.data.local.dao.BlogDao
 import dev.devscroll.data.local.dao.SavedArticleDao
 import dev.devscroll.data.local.dao.SearchArticleDao
 import javax.inject.Singleton
@@ -32,4 +33,7 @@ object DatabaseModule {
 
     @Provides
     fun provideSearchArticleDao(database: AppDatabase): SearchArticleDao = database.searchArticleDao()
+
+    @Provides
+    fun provideBlogDao(database: AppDatabase): BlogDao = database.blogDao()
 }

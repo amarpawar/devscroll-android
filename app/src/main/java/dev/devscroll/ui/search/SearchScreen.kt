@@ -42,10 +42,31 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.components.ArticleCard
 import dev.devscroll.ui.components.SourceBadge
 import dev.devscroll.ui.components.TagChip
+import dev.devscroll.ui.components.TerminalToast
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -55,14 +76,36 @@ fun SearchScreen(
     onApplyTags: (List<String>) -> Unit,
     onSearch: (String) -> Unit = {},
     initialFilterTags: Set<String> = emptySet(),
+    onSignInClick: () -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val query by viewModel.query.collectAsState()
     val results by viewModel.results.collectAsState()
     val topTags by viewModel.topTags.collectAsState()
     val sources by viewModel.sources.collectAsState()
+    val user by viewModel.userState.collectAsState()
     val focusRequester = remember { FocusRequester() }
     var searchSubmitted by remember { mutableStateOf(false) }
+
+    var showAuthToast by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showAuthToast) {
+        if (showAuthToast) {
+            kotlinx.coroutines.delay(2500.milliseconds)
+            showAuthToast = false
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
+    val cursorAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 530, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "cursorAlpha",
+    )
 
     val onArticleClicked = remember(viewModel, onArticleClick) {
         { article: dev.devscroll.data.model.Article ->
@@ -70,9 +113,13 @@ fun SearchScreen(
             onArticleClick(article.id)
         }
     }
-    val onSaveClicked = remember(viewModel) {
+    val onSaveClicked = remember(viewModel, user) {
         { article: dev.devscroll.data.model.Article ->
-            viewModel.toggleSave(article.id)
+            if (user == null) {
+                showAuthToast = true
+            } else {
+                viewModel.toggleSave(article.id)
+            }
         }
     }
     val isIdle = query.isBlank()
@@ -93,7 +140,8 @@ fun SearchScreen(
     BackHandler { handleBack() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
         // Input bar
         Row(
             modifier = Modifier
@@ -249,4 +297,40 @@ fun SearchScreen(
             }
         }
     }
+
+    // Dimming Scrim behind the toast
+    if (showAuthToast) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) {
+                    showAuthToast = false
+                }
+        )
+    }
+
+    // Terminal Toast overlay matching screenshot design
+    AnimatedVisibility(
+        visible = showAuthToast,
+        enter = fadeIn(animationSpec = tween(250)) + slideInVertically(initialOffsetY = { it }, animationSpec = tween(250)),
+        exit = fadeOut(animationSpec = tween(250)) + slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250)),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 16.dp, vertical = 24.dp)
+    ) {
+        TerminalToast(
+            actionLabel = "save articles",
+            commandLabel = "save",
+            cursorAlpha = cursorAlpha,
+            modifier = Modifier.clickable {
+                showAuthToast = false
+                onSignInClick()
+            }
+        )
+    }
+}
 }

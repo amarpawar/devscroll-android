@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.devscroll.data.model.Article
+import dev.devscroll.data.model.User
 import dev.devscroll.data.repository.ArticleRepository
+import dev.devscroll.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import dev.devscroll.ui.PaginationConfig
 import javax.inject.Inject
 
 enum class SortOrder { NEWEST, HOT }
@@ -30,7 +33,7 @@ data class FeedUiState(
     val error: String? = null,
     val activeCategoryFilters: Set<String> = emptySet(),
     val sortOrder: SortOrder = SortOrder.NEWEST,
-    val pagesTrimmed: Boolean = false,
+    val isBatchLimitReached: Boolean = false,
     val isSearchActive: Boolean = false,
     val searchQuery: String = "",
 )
@@ -40,26 +43,28 @@ private data class LoadState(
     val isLoadingMore: Boolean = false,
     val hasNext: Boolean = false,
     val error: String? = null,
-    val pagesTrimmed: Boolean = false,
     val searchQuery: String? = null,
 )
 
-private const val PAGE_SIZE = 20
-private const val MAX_PAGES = 10
+
 
 @HiltViewModel
 class FeedViewModel @Inject constructor(
     private val repository: ArticleRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
+
+    val userState: StateFlow<User?> = authRepository.userState
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
+        )
 
     private val categoryFilters = MutableStateFlow<Set<String>>(emptySet())
     private val sortOrder = MutableStateFlow(SortOrder.NEWEST)
     private val loadState = MutableStateFlow(LoadState())
     private var currentPage = 0
-    private var firstLoadedPage = 0
-
-    private val _newArticleCount = MutableStateFlow(0)
-    val newArticleCount: StateFlow<Int> = _newArticleCount.asStateFlow()
 
     private val articleSource = loadState
         .map { it.searchQuery }
@@ -88,6 +93,7 @@ class FeedViewModel @Inject constructor(
                     }
                 }
         }
+        val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
         FeedUiState(
             articles = processed,
             isRefreshing = load.isRefreshing,
@@ -96,7 +102,7 @@ class FeedViewModel @Inject constructor(
             error = load.error,
             activeCategoryFilters = filters,
             sortOrder = sort,
-            pagesTrimmed = load.pagesTrimmed,
+            isBatchLimitReached = limitReached,
             isSearchActive = isSearchActive,
             searchQuery = load.searchQuery ?: "",
         )
@@ -120,14 +126,11 @@ class FeedViewModel @Inject constructor(
         }
         viewModelScope.launch {
             currentPage = 0
-            firstLoadedPage = 0
-            val existingIds = repository.getArticleIds()
-            loadState.update { it.copy(isRefreshing = true, error = null, pagesTrimmed = false) }
+            loadState.update { it.copy(isRefreshing = true, error = null) }
+            repository.clearFeedArticles()
             repository.fetchArticles(page = 0)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
-                    val newCount = repository.getArticleIds().count { it !in existingIds }
-                    if (newCount > 0) _newArticleCount.value = newCount
                 }
                 .onFailure { e ->
                     loadState.update { it.copy(isRefreshing = false, error = e.message) }
@@ -139,6 +142,7 @@ class FeedViewModel @Inject constructor(
         viewModelScope.launch {
             currentPage = 0
             loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = query) }
+            repository.clearSearchResults()
             repository.search(query = query, page = 0)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
@@ -157,28 +161,12 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    fun reloadEvictedPages() {
-        val pagesToReload = firstLoadedPage
-        if (pagesToReload == 0) return
-        viewModelScope.launch {
-            loadState.update { it.copy(isRefreshing = true, error = null, pagesTrimmed = false) }
-            for (page in 0 until pagesToReload) {
-                repository.fetchArticles(page = page)
-                    .onFailure { e ->
-                        loadState.update { it.copy(isRefreshing = false, error = e.message) }
-                        return@launch
-                    }
-            }
-            firstLoadedPage = 0
-            loadState.update { it.copy(isRefreshing = false) }
-        }
-    }
-
-    fun clearNewArticleCount() { _newArticleCount.value = 0 }
-
     fun loadNextPage() {
         val state = loadState.value
         if (state.isLoadingMore || state.isRefreshing || !state.hasNext) return
+        val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
+        if (limitReached) return
+
         viewModelScope.launch {
             currentPage++
             loadState.update { it.copy(isLoadingMore = true) }
@@ -189,20 +177,57 @@ class FeedViewModel @Inject constructor(
             }
             result
                 .onSuccess { page ->
-                    val trimmed = state.searchQuery == null && currentPage >= MAX_PAGES
-                    if (trimmed) {
-                        repository.deleteNewestArticles(PAGE_SIZE)
-                        firstLoadedPage++
-                    }
                     loadState.update { it.copy(
                         isLoadingMore = false,
                         hasNext = page.hasNext,
-                        pagesTrimmed = if (state.searchQuery == null) firstLoadedPage > 0 else false,
                     )}
                 }
                 .onFailure { e ->
                     currentPage--
                     loadState.update { it.copy(isLoadingMore = false, error = e.message) }
+                }
+        }
+    }
+
+    fun loadNextBatch() {
+        val state = loadState.value
+        if (state.isLoadingMore || state.isRefreshing || !state.hasNext) return
+        viewModelScope.launch {
+            currentPage++
+            loadState.update { it.copy(isRefreshing = true, error = null) }
+            if (state.searchQuery == null) {
+                repository.clearFeedArticles()
+            } else {
+                repository.clearSearchResults()
+            }
+            val result = if (state.searchQuery != null) {
+                repository.search(query = state.searchQuery, page = currentPage)
+            } else {
+                repository.fetchArticles(page = currentPage)
+            }
+            result
+                .onSuccess { page ->
+                    loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
+                }
+                .onFailure { e ->
+                    currentPage--
+                    loadState.update { it.copy(isRefreshing = false, error = e.message) }
+                }
+        }
+    }
+
+    fun resetAndRefresh() {
+        viewModelScope.launch {
+            currentPage = 0
+            loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = null) }
+            repository.clearFeedArticles()
+            repository.clearSearchResults()
+            repository.fetchArticles(page = 0)
+                .onSuccess { page ->
+                    loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
+                }
+                .onFailure { e ->
+                    loadState.update { it.copy(isRefreshing = false, error = e.message) }
                 }
         }
     }

@@ -28,7 +28,12 @@ interface ArticleDao {
     @Query("SELECT articleId, isRead, isSaved FROM articles WHERE articleId IN (:ids)")
     suspend fun getUserState(ids: List<Long>): List<ArticleUserState>
 
-    @Query("SELECT * FROM articles ORDER BY publishedOn DESC")
+    @Query("""
+        SELECT a.* FROM articles a
+        INNER JOIN blogs b ON a.blogId = b.blogId
+        WHERE b.isSubscribed = 1
+        ORDER BY a.publishedOn DESC
+    """)
     fun observeAll(): Flow<List<ArticleEntity>>
 
     @Query("SELECT * FROM articles WHERE isSaved = 1 ORDER BY publishedOn DESC")
@@ -47,6 +52,12 @@ interface ArticleDao {
 
     @Query("UPDATE articles SET isSaved = :saved WHERE articleId = :id")
     suspend fun setSaved(id: Long, saved: Boolean)
+
+    @Query("UPDATE articles SET isSaved = 0 WHERE isSaved = 1")
+    suspend fun clearSavedFlags()
+
+    @Query("DELETE FROM articles")
+    suspend fun clearAll()
 
     @Query("UPDATE articles SET isSaved = NOT isSaved WHERE articleId = :id")
     suspend fun toggleSaved(id: Long)

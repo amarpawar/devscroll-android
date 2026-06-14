@@ -60,3 +60,20 @@ fun ArticleEntity.toSavedEntity(savedAt: Long = System.currentTimeMillis()) = Sa
     url = url,
     savedAt = savedAt,
 )
+
+fun Article.toSavedEntity(savedAt: Long = System.currentTimeMillis()) = SavedArticleEntity(
+    articleId = id,
+    authors = authors,
+    blogId = blogId,
+    blogName = blogName,
+    categories = categories,
+    description = description,
+    hitCount = hitCount,
+    publishedOn = publishedOn,
+    readMinutes = readMinutes,
+    thumbnailUrl = thumbnailUrl,
+    title = title,
+    url = url,
+    savedAt = savedAt,
+)
+

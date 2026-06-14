@@ -14,9 +14,14 @@ interface ArticleRepository {
     suspend fun search(query: String, page: Int = 0): Result<ArticlesPage>
     fun observeSearchResults(): Flow<List<Article>>
     suspend fun clearSearchResults()
+    suspend fun clearFeedArticles()
+    suspend fun clearSavedArticlesCache()
     suspend fun getArticleIds(): Set<Long>
     suspend fun markRead(id: Long)
     suspend fun toggleSave(id: Long)
     suspend fun getArticle(id: Long): Article?
     suspend fun deleteNewestArticles(count: Int)
+    suspend fun unsubscribeBlog(blogId: Long): Result<Unit>
+    suspend fun subscribeBlog(blogId: Long): Result<Unit>
+    suspend fun refreshSources(): Result<Unit>
 }
