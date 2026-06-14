@@ -10,7 +10,6 @@ import dev.devscroll.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -23,7 +22,7 @@ import kotlinx.coroutines.launch
 import dev.devscroll.ui.PaginationConfig
 import javax.inject.Inject
 
-enum class SortOrder { NEWEST, HOT }
+enum class SortOrder { NEWEST, TRENDING }
 
 data class FeedUiState(
     val articles: List<Article> = emptyList(),
@@ -89,7 +88,7 @@ class FeedViewModel @Inject constructor(
                 .let { list ->
                     when (sort) {
                         SortOrder.NEWEST -> list.sortedByDescending { it.publishedOn }
-                        SortOrder.HOT -> list.sortedByDescending { it.hitCount }
+                        SortOrder.TRENDING -> list.sortedByDescending { it.hitCount }
                     }
                 }
         }
@@ -128,7 +127,7 @@ class FeedViewModel @Inject constructor(
             currentPage = 0
             loadState.update { it.copy(isRefreshing = true, error = null) }
             repository.clearFeedArticles()
-            repository.fetchArticles(page = 0)
+            repository.fetchArticles(page = 0, sortType = sortOrder.value.name)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
                 }
@@ -173,7 +172,7 @@ class FeedViewModel @Inject constructor(
             val result = if (state.searchQuery != null) {
                 repository.search(query = state.searchQuery, page = currentPage)
             } else {
-                repository.fetchArticles(page = currentPage)
+                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name)
             }
             result
                 .onSuccess { page ->
@@ -203,7 +202,7 @@ class FeedViewModel @Inject constructor(
             val result = if (state.searchQuery != null) {
                 repository.search(query = state.searchQuery, page = currentPage)
             } else {
-                repository.fetchArticles(page = currentPage)
+                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name)
             }
             result
                 .onSuccess { page ->
@@ -222,7 +221,7 @@ class FeedViewModel @Inject constructor(
             loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = null) }
             repository.clearFeedArticles()
             repository.clearSearchResults()
-            repository.fetchArticles(page = 0)
+            repository.fetchArticles(page = 0, sortType = sortOrder.value.name)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
                 }
@@ -239,7 +238,8 @@ class FeedViewModel @Inject constructor(
     fun clearFilter() { categoryFilters.value = emptySet() }
 
     fun toggleSort() {
-        sortOrder.update { if (it == SortOrder.NEWEST) SortOrder.HOT else SortOrder.NEWEST }
+        sortOrder.update { if (it == SortOrder.NEWEST) SortOrder.TRENDING else SortOrder.NEWEST }
+        resetAndRefresh()
     }
 
     fun clearError() { loadState.update { it.copy(error = null) } }

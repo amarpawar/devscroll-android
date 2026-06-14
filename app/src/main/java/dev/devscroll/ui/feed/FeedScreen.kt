@@ -240,7 +240,7 @@ fun FeedScreen(
                                 color = primaryColor
                             )
                         ) {
-                            append(if (uiState.sortOrder == SortOrder.NEWEST) "↓ newest" else "↑ hot")
+                            append(if (uiState.sortOrder == SortOrder.NEWEST) "↓ newest" else "↑ trending")
                         }
                     }
                 }
