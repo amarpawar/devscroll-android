@@ -60,6 +60,13 @@ class FeedViewModel @Inject constructor(
             initialValue = null,
         )
 
+    val savingArticles: StateFlow<Set<Long>> = repository.observeSavingIds()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptySet(),
+        )
+
     private val categoryFilters = MutableStateFlow<Set<String>>(emptySet())
     private val sortOrder = MutableStateFlow(SortOrder.NEWEST)
     private val loadState = MutableStateFlow(LoadState())

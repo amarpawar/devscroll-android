@@ -34,7 +34,7 @@ interface DevscrollApiService {
     @DELETE("devscroll/api/users/me/saved-articles/{article_id}")
     suspend fun unsaveArticle(@Path("article_id") articleId: Long)
 
-    @GET("devscroll/api/articles/saved")
+    @GET("devscroll/api/users/me/saved-articles")
     suspend fun getSavedArticles(
         @Query("page") page: Int,
         @Query("size") size: Int = 20,

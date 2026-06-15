@@ -37,7 +37,7 @@ data class UserProfileDto(
     @SerializedName("email") val email: String,
     @SerializedName("name") val name: String,
     @SerializedName("profilePicUrl") val pictureUrl: String?,
-    @SerializedName("savedCount") val savedCount: Int? = 0,
-    @SerializedName("subsCount") val subsCount: Int? = 0,
+    @SerializedName("savedArticlesCount") val savedArticlesCount: Int? = 0,
+    @SerializedName("subscriptionsCount") val subscriptionsCount: Int? = 0,
     @SerializedName("streakCount") val streakCount: Int? = 0
 )

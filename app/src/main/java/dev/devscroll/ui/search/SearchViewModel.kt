@@ -30,6 +30,13 @@ class SearchViewModel @Inject constructor(
             initialValue = null,
         )
 
+    val savingArticles: StateFlow<Set<Long>> = repository.observeSavingIds()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptySet(),
+        )
+
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query
 

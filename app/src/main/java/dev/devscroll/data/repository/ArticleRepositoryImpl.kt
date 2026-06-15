@@ -17,6 +17,9 @@ import dev.devscroll.data.remote.dto.toSearchEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,6 +31,10 @@ class ArticleRepositoryImpl @Inject constructor(
     private val searchArticleDao: SearchArticleDao,
     private val blogDao: BlogDao,
 ) : ArticleRepository {
+    private val savingIds = MutableStateFlow<Set<Long>>(emptySet())
+
+    override fun observeSavingIds(): Flow<Set<Long>> = savingIds.asStateFlow()
+
 
     override fun observeArticles(): Flow<List<Article>> =
         articleDao.observeAll().map { list -> list.map { it.toDomain() } }
@@ -136,17 +143,22 @@ class ArticleRepositoryImpl @Inject constructor(
     override suspend fun toggleSave(id: Long) {
         val article = getArticle(id) ?: return
         val currentlySaved = article.isSaved
-        if (currentlySaved) {
-            runCatching { apiService.unsaveArticle(id) }
-            articleDao.setSaved(id, false)
-            searchArticleDao.setSaved(id, false)
-            savedArticleDao.delete(id)
-        } else {
-            runCatching { apiService.saveArticle(id) }
-            articleDao.setSaved(id, true)
-            searchArticleDao.setSaved(id, true)
-            val savedEntity = article.toSavedLocalEntity(savedAt = System.currentTimeMillis())
-            savedArticleDao.upsert(savedEntity)
+        savingIds.update { it + id }
+        try {
+            if (currentlySaved) {
+                runCatching { apiService.unsaveArticle(id) }
+                articleDao.setSaved(id, false)
+                searchArticleDao.setSaved(id, false)
+                savedArticleDao.delete(id)
+            } else {
+                runCatching { apiService.saveArticle(id) }
+                articleDao.setSaved(id, true)
+                searchArticleDao.setSaved(id, true)
+                val savedEntity = article.toSavedLocalEntity(savedAt = System.currentTimeMillis())
+                savedArticleDao.upsert(savedEntity)
+            }
+        } finally {
+            savingIds.update { it - id }
         }
     }
 

@@ -24,4 +24,5 @@ interface ArticleRepository {
     suspend fun unsubscribeBlog(blogId: Long): Result<Unit>
     suspend fun subscribeBlog(blogId: Long): Result<Unit>
     suspend fun refreshSources(): Result<Unit>
+    fun observeSavingIds(): Flow<Set<Long>>
 }

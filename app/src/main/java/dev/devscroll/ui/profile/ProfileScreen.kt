@@ -27,7 +27,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,6 +68,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     themeViewModel: ThemeViewModel = hiltViewModel(),
@@ -86,8 +90,13 @@ fun ProfileScreen(
             }
         }
         is AuthUiState.LoggedIn -> {
+            LaunchedEffect(Unit) {
+                profileViewModel.refreshProfile()
+            }
             LoggedInDashboard(
                 user = state.user,
+                isRefreshing = state.isRefreshing,
+                onRefresh = { profileViewModel.refreshProfile() },
                 onLogout = { profileViewModel.logout() },
                 themeViewModel = themeViewModel
             )
@@ -119,9 +128,12 @@ fun ProfileScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LoggedInDashboard(
     user: dev.devscroll.data.model.User,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
     onLogout: () -> Unit,
     themeViewModel: ThemeViewModel
 ) {
@@ -136,13 +148,33 @@ private fun LoggedInDashboard(
         )
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.weight(1f),
+            indicator = {}
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (isRefreshing) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TerminalLoader(
+                            labels = listOf("CONNECT /auth", "HANDSHAKE", "GET /profile"),
+                            modifier = Modifier.fillMaxWidth(0.6f)
+                        )
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                }
             // Header Row: < $ whoami
             Row(
                 modifier = Modifier
@@ -264,7 +296,7 @@ private fun LoggedInDashboard(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = user.savedCount.toString(),
+                        text = user.savedArticlesCount.toString(),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -286,7 +318,7 @@ private fun LoggedInDashboard(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = user.subsCount.toString(),
+                        text = user.subscriptionsCount.toString(),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -397,7 +429,7 @@ private fun LoggedInDashboard(
                     }
                     
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AccentColor.values().forEach { accent ->
+                        AccentColor.entries.forEach { accent ->
                             val isActive = currentAccent == accent
                             Box(
                                 modifier = Modifier
@@ -486,6 +518,7 @@ private fun LoggedInDashboard(
                     onClick = {}
                 )
             }
+        }
         }
     }
 }

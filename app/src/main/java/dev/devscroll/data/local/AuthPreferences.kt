@@ -23,8 +23,8 @@ class AuthPreferences @Inject constructor(
     private val userEmailKey = stringPreferencesKey("user_email")
     private val userNameKey = stringPreferencesKey("user_name")
     private val userPictureKey = stringPreferencesKey("user_picture")
-    private val userSavedCountKey = androidx.datastore.preferences.core.intPreferencesKey("user_saved_count")
-    private val userSubsCountKey = androidx.datastore.preferences.core.intPreferencesKey("user_subs_count")
+    private val userSavedArticlesCountKey = androidx.datastore.preferences.core.intPreferencesKey("user_saved_articles_count")
+    private val userSubscriptionsCountKey = androidx.datastore.preferences.core.intPreferencesKey("user_subscriptions_count")
     private val userStreakCountKey = androidx.datastore.preferences.core.intPreferencesKey("user_streak_count")
     private val userProviderKey = stringPreferencesKey("user_provider")
 
@@ -40,8 +40,8 @@ class AuthPreferences @Inject constructor(
         val email = prefs[userEmailKey]
         val name = prefs[userNameKey]
         val pictureUrl = prefs[userPictureKey]
-        val saved = prefs[userSavedCountKey] ?: 0
-        val subs = prefs[userSubsCountKey] ?: 0
+        val saved = prefs[userSavedArticlesCountKey] ?: 0
+        val subs = prefs[userSubscriptionsCountKey] ?: 0
         val streak = prefs[userStreakCountKey] ?: 0
         val provider = prefs[userProviderKey] ?: "username/password"
         if (email != null && name != null) {
@@ -49,8 +49,8 @@ class AuthPreferences @Inject constructor(
                 email = email,
                 name = name,
                 pictureUrl = pictureUrl?.ifEmpty { null },
-                savedCount = saved,
-                subsCount = subs,
+                savedArticlesCount = saved,
+                subscriptionsCount = subs,
                 streakCount = streak,
                 provider = provider
             )
@@ -70,8 +70,8 @@ class AuthPreferences @Inject constructor(
         email: String,
         name: String,
         pictureUrl: String?,
-        savedCount: Int = 0,
-        subsCount: Int = 0,
+        savedArticlesCount: Int = 0,
+        subscriptionsCount: Int = 0,
         streakCount: Int = 0,
         provider: String = "username/password"
     ) {
@@ -79,8 +79,8 @@ class AuthPreferences @Inject constructor(
             prefs[userEmailKey] = email
             prefs[userNameKey] = name
             prefs[userPictureKey] = pictureUrl ?: ""
-            prefs[userSavedCountKey] = savedCount
-            prefs[userSubsCountKey] = subsCount
+            prefs[userSavedArticlesCountKey] = savedArticlesCount
+            prefs[userSubscriptionsCountKey] = subscriptionsCount
             prefs[userStreakCountKey] = streakCount
             prefs[userProviderKey] = provider
         }

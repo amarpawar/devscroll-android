@@ -17,7 +17,7 @@ sealed interface AuthUiState {
     object LoggedOut : AuthUiState
     object Loading : AuthUiState
     object Authenticating : AuthUiState
-    data class LoggedIn(val user: User) : AuthUiState
+    data class LoggedIn(val user: User, val isRefreshing: Boolean = false) : AuthUiState
     data class Error(val message: String) : AuthUiState
 }
 
@@ -27,14 +27,16 @@ class ProfileViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _localState = MutableStateFlow<AuthUiState?>(null)
+    private val _isRefreshing = MutableStateFlow(false)
 
     val uiState: StateFlow<AuthUiState> = combine(
         authRepository.userState,
-        _localState
-    ) { user, local ->
+        _localState,
+        _isRefreshing
+    ) { user, local, refreshing ->
         when {
             local != null -> local
-            user != null -> AuthUiState.LoggedIn(user)
+            user != null -> AuthUiState.LoggedIn(user, refreshing)
             else -> AuthUiState.LoggedOut
         }
     }
@@ -106,6 +108,14 @@ class ProfileViewModel @Inject constructor(
                 .onFailure { error ->
                     _localState.value = AuthUiState.Error(error.message ?: "Logout failed")
                 }
+        }
+    }
+
+    fun refreshProfile() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            authRepository.refreshProfile()
+            _isRefreshing.value = false
         }
     }
 

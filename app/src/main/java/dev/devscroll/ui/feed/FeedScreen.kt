@@ -2,6 +2,8 @@ package dev.devscroll.ui.feed
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,6 +83,7 @@ fun FeedScreen(
     themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val savingArticles by viewModel.savingArticles.collectAsState()
     val themeState by themeViewModel.themeState.collectAsState()
     val user by viewModel.userState.collectAsState()
 
@@ -311,7 +314,12 @@ fun FeedScreen(
                     onRefresh = { viewModel.refresh() },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        contentAlignment = Alignment.Center
+                    ) {
                         BlinkingEmptyState("no articles. pull to refresh")
                     }
                 }
@@ -333,6 +341,7 @@ fun FeedScreen(
                                 article = article,
                                 onArticleClick = onArticleClicked,
                                 onSaveClick = onSaveClicked,
+                                isSaving = article.id in savingArticles,
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         }

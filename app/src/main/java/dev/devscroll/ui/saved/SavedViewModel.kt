@@ -39,6 +39,13 @@ class SavedViewModel @Inject constructor(
             initialValue = null,
         )
 
+    val savingArticles: StateFlow<Set<Long>> = repository.observeSavingIds()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptySet(),
+        )
+
     private val loadState = MutableStateFlow(SavedUiState())
     private var currentPage = 0
 

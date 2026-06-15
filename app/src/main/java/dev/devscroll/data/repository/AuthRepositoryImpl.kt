@@ -53,15 +53,15 @@ class AuthRepositoryImpl @Inject constructor(
 
     private suspend fun fetchAndSaveProfile(provider: String): User {
         val profile = apiService.getUserProfile()
-        val saved = profile.savedCount ?: 0
-        val subs = profile.subsCount ?: 0
+        val saved = profile.savedArticlesCount ?: 0
+        val subs = profile.subscriptionsCount ?: 0
         val streak = profile.streakCount ?: 0
         authPreferences.saveProfile(
             email = profile.email,
             name = profile.name,
             pictureUrl = profile.pictureUrl,
-            savedCount = saved,
-            subsCount = subs,
+            savedArticlesCount = saved,
+            subscriptionsCount = subs,
             streakCount = streak,
             provider = provider
         )
@@ -69,10 +69,15 @@ class AuthRepositoryImpl @Inject constructor(
             email = profile.email,
             name = profile.name,
             pictureUrl = profile.pictureUrl,
-            savedCount = saved,
-            subsCount = subs,
+            savedArticlesCount = saved,
+            subscriptionsCount = subs,
             streakCount = streak,
             provider = provider
         )
+    }
+
+    override suspend fun refreshProfile(): Result<User> = runCatching {
+        val currentUser = userState.first() ?: throw IllegalStateException("User not logged in")
+        fetchAndSaveProfile(currentUser.provider)
     }
 }

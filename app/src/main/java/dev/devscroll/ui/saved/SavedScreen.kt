@@ -1,60 +1,55 @@
 package dev.devscroll.ui.saved
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import dev.devscroll.ui.PaginationConfig
 import dev.devscroll.ui.components.ArticleCard
 import dev.devscroll.ui.components.BlinkingEmptyState
-import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalLoadMore
+import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalToast
 import dev.devscroll.ui.components.TopBar
 import dev.devscroll.ui.theme.ThemeViewModel
-import dev.devscroll.ui.PaginationConfig
+import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +62,7 @@ fun SavedScreen(
     themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val savingArticles by viewModel.savingArticles.collectAsState()
     val articles = uiState.articles
     val themeState by themeViewModel.themeState.collectAsState()
     val user by viewModel.userState.collectAsState()
@@ -143,7 +139,12 @@ fun SavedScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 if (articles.isEmpty() && !uiState.isRefreshing) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        contentAlignment = Alignment.Center
+                    ) {
                         BlinkingEmptyState("nothing saved yet")
                     }
                 } else {
@@ -160,6 +161,7 @@ fun SavedScreen(
                                 article = article,
                                 onArticleClick = onArticleClicked,
                                 onSaveClick = onSaveClicked,
+                                isSaving = article.id in savingArticles,
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         }

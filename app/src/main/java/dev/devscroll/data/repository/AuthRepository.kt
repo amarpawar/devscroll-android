@@ -15,4 +15,6 @@ interface AuthRepository {
     suspend fun signUpWithEmail(email: String, pass: String): Result<User>
     
     suspend fun logout(): Result<Unit>
+
+    suspend fun refreshProfile(): Result<User>
 }

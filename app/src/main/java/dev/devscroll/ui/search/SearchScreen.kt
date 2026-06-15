@@ -84,6 +84,7 @@ fun SearchScreen(
     val topTags by viewModel.topTags.collectAsState()
     val sources by viewModel.sources.collectAsState()
     val user by viewModel.userState.collectAsState()
+    val savingArticles by viewModel.savingArticles.collectAsState()
     val focusRequester = remember { FocusRequester() }
     var searchSubmitted by remember { mutableStateOf(false) }
 
@@ -291,6 +292,7 @@ fun SearchScreen(
                         article = article,
                         onArticleClick = onArticleClicked,
                         onSaveClick = onSaveClicked,
+                        isSaving = article.id in savingArticles,
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }

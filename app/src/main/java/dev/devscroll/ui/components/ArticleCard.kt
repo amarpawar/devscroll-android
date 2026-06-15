@@ -26,6 +26,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -47,6 +50,7 @@ fun ArticleCard(
     article: Article,
     onArticleClick: (Article) -> Unit,
     onSaveClick: (Article) -> Unit,
+    isSaving: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (article.isHot) {
@@ -54,6 +58,7 @@ fun ArticleCard(
             article = article,
             onArticleClick = onArticleClick,
             onSaveClick = onSaveClick,
+            isSaving = isSaving,
             modifier = modifier,
         )
     } else {
@@ -61,6 +66,7 @@ fun ArticleCard(
             article = article,
             onArticleClick = onArticleClick,
             onSaveClick = onSaveClick,
+            isSaving = isSaving,
             modifier = modifier,
         )
     }
@@ -71,6 +77,7 @@ private fun StandardArticleCard(
     article: Article,
     onArticleClick: (Article) -> Unit,
     onSaveClick: (Article) -> Unit,
+    isSaving: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -180,16 +187,24 @@ private fun StandardArticleCard(
             } else {
                 Spacer(Modifier.weight(1f))
             }
-            IconButton(onClick = { onSaveClick(article) }, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = if (article.isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                    contentDescription = if (article.isSaved) "Unsave" else "Save",
-                    tint = if (article.isSaved)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
+            IconButton(
+                onClick = { if (!isSaving) onSaveClick(article) },
+                enabled = !isSaving,
+                modifier = Modifier.size(36.dp)
+            ) {
+                if (isSaving) {
+                    TerminalSpinner(modifier = Modifier.size(18.dp))
+                } else {
+                    Icon(
+                        imageVector = if (article.isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = if (article.isSaved) "Unsave" else "Save",
+                        tint = if (article.isSaved)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }
@@ -252,6 +267,7 @@ private fun HotArticleCard(
     article: Article,
     onArticleClick: (Article) -> Unit,
     onSaveClick: (Article) -> Unit,
+    isSaving: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -328,16 +344,24 @@ private fun HotArticleCard(
             } else {
                 Spacer(Modifier.weight(1f))
             }
-            IconButton(onClick = { onSaveClick(article) }, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    imageVector = if (article.isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                    contentDescription = if (article.isSaved) "Unsave" else "Save",
-                    tint = if (article.isSaved)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
+            IconButton(
+                onClick = { if (!isSaving) onSaveClick(article) },
+                enabled = !isSaving,
+                modifier = Modifier.size(36.dp)
+            ) {
+                if (isSaving) {
+                    TerminalSpinner(modifier = Modifier.size(18.dp))
+                } else {
+                    Icon(
+                        imageVector = if (article.isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = if (article.isSaved) "Unsave" else "Save",
+                        tint = if (article.isSaved)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }
@@ -449,6 +473,25 @@ private fun HotThumbnailOverlay(article: Article) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             modifier = Modifier.align(Alignment.BottomEnd)
+        )
+    }
+}
+
+@Composable
+fun TerminalSpinner(modifier: Modifier = Modifier) {
+    val chars = listOf("\\", "|", "/", "-")
+    var charIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(150L)
+            charIndex = (charIndex + 1) % chars.size
+        }
+    }
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Text(
+            text = chars[charIndex],
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
         )
     }
 }
