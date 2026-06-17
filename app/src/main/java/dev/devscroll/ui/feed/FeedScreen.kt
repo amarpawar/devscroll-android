@@ -96,17 +96,6 @@ fun FeedScreen(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
-    val cursorAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 530, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "cursorAlpha",
-    )
-
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     
@@ -126,7 +115,6 @@ fun FeedScreen(
         }
     }
 
-    val isAtTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -410,7 +398,6 @@ fun FeedScreen(
         TerminalToast(
             actionLabel = "save articles",
             commandLabel = "save",
-            cursorAlpha = cursorAlpha,
             modifier = Modifier.clickable {
                 showAuthToast = false
                 onSignInClick()

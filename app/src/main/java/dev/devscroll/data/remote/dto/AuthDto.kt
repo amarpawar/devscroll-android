@@ -30,7 +30,8 @@ data class LogoutRequest(
 
 data class TokenPair(
     @SerializedName("accessToken") val accessToken: String,
-    @SerializedName("refreshToken") val refreshToken: String
+    @SerializedName("refreshToken") val refreshToken: String,
+    @SerializedName("expiresIn") val expiresIn: Int? = 0
 )
 
 data class UserProfileDto(

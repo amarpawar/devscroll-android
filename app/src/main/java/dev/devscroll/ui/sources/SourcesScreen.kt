@@ -446,7 +446,6 @@ fun SourcesScreen(
             TerminalToast(
                 actionLabel = "manage subscriptions",
                 commandLabel = "subscribe",
-                cursorAlpha = cursorAlpha,
                 modifier = Modifier.clickable {
                     showAuthToast = false
                     onSignInClick()

@@ -23,6 +23,12 @@ class TokenAuthenticator @Inject constructor(
     private val mutex = Mutex()
 
     override fun authenticate(route: Route?, response: Response): Request? {
+        val bodyString = runCatching { response.peekBody(1024).string() }.getOrNull()
+        val isTokenExpired = bodyString != null && bodyString.contains("TOKEN_EXPIRED")
+        if (!isTokenExpired) {
+            return null
+        }
+
         return runBlocking {
             mutex.withLock {
                 val currentToken = authPreferences.accessToken.first()

@@ -32,9 +32,12 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,6 +47,23 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import dev.devscroll.data.model.Article
 import kotlin.math.abs
+
+private val thumbnailSymbols = listOf("//", "#!", "~/", "\$_", "&&", "||", ">>", "{}", "[]", "=>", "::", "!!")
+private val thumbnailBgColors = listOf(
+    Color(0xFF1A2A10), Color(0xFF0A2035), Color(0xFF2A1E08),
+    Color(0xFF2D0A12), Color(0xFF1E1535), Color(0xFF0D1A2E), Color(0xFF0D2020),
+)
+private val thumbnailStripeColor = Color(0xFF2A3A2A).copy(alpha = 0.6f)
+
+/** Builds the diagonal-stripe pattern once for a given size so it isn't recomputed each frame. */
+private fun buildStripePath(size: Size, spacing: Float): Path = Path().apply {
+    var offset = -size.height
+    while (offset < size.width) {
+        moveTo(offset, 0f)
+        lineTo(offset + size.height, size.height)
+        offset += spacing
+    }
+}
 
 @Composable
 fun ArticleCard(
@@ -152,15 +172,18 @@ private fun StandardArticleCard(
             }
             if (article.thumbnailUrl != null) {
                 var isImageLoaded by remember(article.id) { mutableStateOf(false) }
+                val onStateChanged = remember(article.id) {
+                    { state: AsyncImagePainter.State ->
+                        isImageLoaded = state is AsyncImagePainter.State.Success
+                    }
+                }
                 Box(modifier = Modifier.size(72.dp)) {
                     AsyncImage(
                         model = article.thumbnailUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(72.dp),
-                        onState = { state ->
-                            isImageLoaded = state is AsyncImagePainter.State.Success
-                        }
+                        onState = onStateChanged
                     )
                     if (!isImageLoaded) {
                         TerminalThumbnail(seed = article.id)
@@ -212,32 +235,22 @@ private fun StandardArticleCard(
 
 @Composable
 private fun TerminalThumbnail(seed: Any) {
-    val symbols = listOf("//", "#!", "~/", "\$_", "&&", "||", ">>", "{}", "[]", "=>", "::", "!!")
-    val bgColors = listOf(
-        Color(0xFF1A2A10), Color(0xFF0A2035), Color(0xFF2A1E08),
-        Color(0xFF2D0A12), Color(0xFF1E1535), Color(0xFF0D1A2E), Color(0xFF0D2020),
-    )
     val hash = abs(seed.hashCode())
-    val symbol = symbols[hash % symbols.size]
-    val bgColor = bgColors[hash % bgColors.size]
+    val symbol = thumbnailSymbols[hash % thumbnailSymbols.size]
+    val bgColor = thumbnailBgColors[hash % thumbnailBgColors.size]
     Box(
         modifier = Modifier
             .size(72.dp)
-            .drawBehind {
-                drawRect(color = bgColor)
-                val stripeColor = Color(0xFF2A3A2A).copy(alpha = 0.6f)
-                val spacing = 10.dp.toPx()
-                clipRect {
-                    var offset = -size.height
-                    while (offset < size.width) {
-                        drawLine(
-                            color = stripeColor,
-                            start = androidx.compose.ui.geometry.Offset(offset, 0f),
-                            end = androidx.compose.ui.geometry.Offset(offset + size.height, size.height),
-                            strokeWidth = 1.dp.toPx(),
-                        )
-                        offset += spacing
-                    }
+            .drawWithCache {
+                val stripes = buildStripePath(size, spacing = 10.dp.toPx())
+                val strokeWidth = 1.dp.toPx()
+                onDrawBehind {
+                    drawRect(color = bgColor)
+                    drawPath(
+                        path = stripes,
+                        color = thumbnailStripeColor,
+                        style = Stroke(width = strokeWidth),
+                    )
                 }
             },
         contentAlignment = Alignment.Center,
@@ -377,14 +390,17 @@ private fun HotThumbnail(article: Article) {
     ) {
         if (article.thumbnailUrl != null) {
             var isImageLoaded by remember(article.id) { mutableStateOf(false) }
+            val onStateChanged = remember(article.id) {
+                { state: AsyncImagePainter.State ->
+                    isImageLoaded = state is AsyncImagePainter.State.Success
+                }
+            }
             AsyncImage(
                 model = article.thumbnailUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-                onState = { state ->
-                    isImageLoaded = state is AsyncImagePainter.State.Success
-                }
+                onState = onStateChanged
             )
             if (!isImageLoaded) {
                 HotTerminalThumbnail(seed = article.id)
@@ -399,32 +415,22 @@ private fun HotThumbnail(article: Article) {
 
 @Composable
 private fun HotTerminalThumbnail(seed: Any) {
-    val symbols = listOf("//", "#!", "~/", "\$_", "&&", "||", ">>", "{}", "[]", "=>", "::", "!!")
-    val bgColors = listOf(
-        Color(0xFF1A2A10), Color(0xFF0A2035), Color(0xFF2A1E08),
-        Color(0xFF2D0A12), Color(0xFF1E1535), Color(0xFF0D1A2E), Color(0xFF0D2020),
-    )
     val hash = abs(seed.hashCode())
-    val symbol = symbols[hash % symbols.size]
-    val bgColor = bgColors[hash % bgColors.size]
+    val symbol = thumbnailSymbols[hash % thumbnailSymbols.size]
+    val bgColor = thumbnailBgColors[hash % thumbnailBgColors.size]
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .drawBehind {
-                drawRect(color = bgColor)
-                val stripeColor = Color(0xFF2A3A2A).copy(alpha = 0.6f)
-                val spacing = 12.dp.toPx()
-                clipRect {
-                    var offset = -size.height
-                    while (offset < size.width) {
-                        drawLine(
-                            color = stripeColor,
-                            start = androidx.compose.ui.geometry.Offset(offset, 0f),
-                            end = androidx.compose.ui.geometry.Offset(offset + size.height, size.height),
-                            strokeWidth = 1.5.dp.toPx(),
-                        )
-                        offset += spacing
-                    }
+            .drawWithCache {
+                val stripes = buildStripePath(size, spacing = 12.dp.toPx())
+                val strokeWidth = 1.5.dp.toPx()
+                onDrawBehind {
+                    drawRect(color = bgColor)
+                    drawPath(
+                        path = stripes,
+                        color = thumbnailStripeColor,
+                        style = Stroke(width = strokeWidth),
+                    )
                 }
             },
         contentAlignment = Alignment.Center,

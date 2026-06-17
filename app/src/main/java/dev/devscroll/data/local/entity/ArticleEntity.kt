@@ -42,7 +42,7 @@ fun ArticleEntity.toDomain() = Article(
     thumbnailUrl = thumbnailUrl,
     title = title,
     url = url,
-    isHot = hitCount > 50,
+    isHot = hitCount > 1,
     isRead = isRead,
     isSaved = isSaved,
 )

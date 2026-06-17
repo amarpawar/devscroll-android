@@ -80,14 +80,24 @@ class FeedViewModel @Inject constructor(
             else repository.observeSearchResults()
         }
 
-    val uiState: StateFlow<FeedUiState> = combine(
+    // Search query lives in loadState, but whether search is active only needs to
+    // gate the filter/sort below. Track it separately so load-flag changes
+    // (isRefreshing/isLoadingMore) don't force a re-sort of the whole list.
+    private val searchActive = loadState
+        .map { it.searchQuery != null }
+        .distinctUntilChanged()
+
+    // Heavy work (filter + sort) depends only on the data, the active filters,
+    // the sort order, and whether search is active. It is deliberately kept out
+    // of the combine with loadState so that pagination/refresh flag toggles do
+    // not re-run the O(n log n) sort over a growing list while the user scrolls.
+    private val processedArticles = combine(
         articleSource,
         categoryFilters,
         sortOrder,
-        loadState,
-    ) { articles, filters, sort, load ->
-        val isSearchActive = load.searchQuery != null
-        val processed = if (isSearchActive) {
+        searchActive,
+    ) { articles, filters, sort, isSearchActive ->
+        if (isSearchActive) {
             articles
         } else {
             articles
@@ -99,9 +109,18 @@ class FeedViewModel @Inject constructor(
                     }
                 }
         }
+    }.flowOn(Dispatchers.Default)
+
+    val uiState: StateFlow<FeedUiState> = combine(
+        processedArticles,
+        categoryFilters,
+        sortOrder,
+        loadState,
+    ) { articles, filters, sort, load ->
+        val isSearchActive = load.searchQuery != null
         val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
         FeedUiState(
-            articles = processed,
+            articles = articles,
             isRefreshing = load.isRefreshing,
             isLoadingMore = load.isLoadingMore,
             hasNext = load.hasNext,
@@ -113,7 +132,6 @@ class FeedViewModel @Inject constructor(
             searchQuery = load.searchQuery ?: "",
         )
     }
-        .flowOn(Dispatchers.Default)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),

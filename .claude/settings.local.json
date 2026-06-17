@@ -20,7 +20,9 @@
       "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew :app:compileLocalDebugKotlin)",
       "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew :app:assembleLocalDebug :app:assembleDevDebug)",
       "Bash(JAVA_HOME=/snap/android-studio/209/jbr ./gradlew :app:compileLocalDebugKotlin --stacktrace)",
-      "Bash(xargs cat)"
+      "Bash(xargs cat)",
+      "Bash(./gradlew :app:compileDebugKotlin -q)",
+      "Bash(./gradlew :app:compileDevDebugKotlin -q)"
     ]
   }
 }

@@ -97,17 +97,6 @@ fun SearchScreen(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
-    val cursorAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 530, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "cursorAlpha",
-    )
-
     val onArticleClicked = remember(viewModel, onArticleClick) {
         { article: dev.devscroll.data.model.Article ->
             viewModel.markRead(article.id)
@@ -327,7 +316,6 @@ fun SearchScreen(
         TerminalToast(
             actionLabel = "save articles",
             commandLabel = "save",
-            cursorAlpha = cursorAlpha,
             modifier = Modifier.clickable {
                 showAuthToast = false
                 onSignInClick()

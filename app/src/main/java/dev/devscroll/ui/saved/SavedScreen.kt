@@ -76,17 +76,6 @@ fun SavedScreen(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
-    val cursorAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 530, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "cursorAlpha",
-    )
-
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val shouldLoadMore by remember {
@@ -229,7 +218,6 @@ fun SavedScreen(
             TerminalToast(
                 actionLabel = "save articles",
                 commandLabel = "save",
-                cursorAlpha = cursorAlpha,
                 modifier = Modifier.clickable {
                     showAuthToast = false
                     onSignInClick()
