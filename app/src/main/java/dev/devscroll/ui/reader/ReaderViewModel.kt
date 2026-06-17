@@ -35,6 +35,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             _article.value = repository.getArticle(id)
             repository.markRead(id)
+            repository.recordArticleHit(id)
         }
     }
 

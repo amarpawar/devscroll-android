@@ -20,6 +20,7 @@ interface ArticleRepository {
     suspend fun markRead(id: Long)
     suspend fun toggleSave(id: Long)
     suspend fun getArticle(id: Long): Article?
+    suspend fun recordArticleHit(articleId: Long): Result<Unit>
     suspend fun deleteNewestArticles(count: Int)
     suspend fun unsubscribeBlog(blogId: Long): Result<Unit>
     suspend fun subscribeBlog(blogId: Long): Result<Unit>

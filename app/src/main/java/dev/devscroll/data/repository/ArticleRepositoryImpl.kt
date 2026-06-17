@@ -166,6 +166,10 @@ class ArticleRepositoryImpl @Inject constructor(
         articleDao.getById(id)?.toDomain()
             ?: searchArticleDao.getById(id)?.toDomain()
 
+    override suspend fun recordArticleHit(articleId: Long): Result<Unit> = runCatching {
+        apiService.recordArticleHit(articleId)
+    }
+
     override suspend fun deleteNewestArticles(count: Int) =
         articleDao.deleteNewest(count)
 
