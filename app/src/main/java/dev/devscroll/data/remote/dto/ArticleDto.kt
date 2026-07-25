@@ -43,6 +43,15 @@ private fun isoFormat() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).a
     timeZone = TimeZone.getTimeZone("UTC")
 }
 
+private fun getFullThumbnailUrl(thumbnail: String?): String? {
+    if (thumbnail == null) return null
+    if (thumbnail.startsWith("http://", ignoreCase = true) || 
+        thumbnail.startsWith("https://", ignoreCase = true)) {
+        return thumbnail
+    }
+    return "${BuildConfig.API_BASE_URL}devscroll/api/thumbnails/$thumbnail"
+}
+
 fun ArticleDto.toEntity(isRead: Boolean = false, isSaved: Boolean = false): ArticleEntity {
     val publishedMillis = parsedPublishedMillis()
     return ArticleEntity(
@@ -55,7 +64,7 @@ fun ArticleDto.toEntity(isRead: Boolean = false, isSaved: Boolean = false): Arti
         hitCount = hitCount,
         publishedOn = publishedMillis,
         readMinutes = readMinutes,
-        thumbnailUrl = thumbnailUrl?.let { "${BuildConfig.API_BASE_URL}devscroll/api/thumbnails/$it" },
+        thumbnailUrl = getFullThumbnailUrl(thumbnailUrl),
         title = title,
         url = url,
         isRead = isRead,
@@ -73,7 +82,7 @@ fun ArticleDto.toSavedEntity(savedAt: Long = System.currentTimeMillis()) = Saved
     hitCount = hitCount,
     publishedOn = parsedPublishedMillis(),
     readMinutes = readMinutes,
-    thumbnailUrl = thumbnailUrl?.let { "${BuildConfig.API_BASE_URL}devscroll/api/thumbnails/$it" },
+    thumbnailUrl = getFullThumbnailUrl(thumbnailUrl),
     title = title,
     url = url,
     savedAt = savedAt,
@@ -89,7 +98,7 @@ fun ArticleDto.toSearchEntity(isRead: Boolean = false, isSaved: Boolean = false)
     hitCount = hitCount,
     publishedOn = parsedPublishedMillis(),
     readMinutes = readMinutes,
-    thumbnailUrl = thumbnailUrl?.let { "${BuildConfig.API_BASE_URL}devscroll/api/thumbnails/$it" },
+    thumbnailUrl = getFullThumbnailUrl(thumbnailUrl),
     title = title,
     url = url,
     isRead = isRead,
