@@ -13,8 +13,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
 
 @HiltViewModel
@@ -50,10 +52,23 @@ class SearchViewModel @Inject constructor(
                 .take(24)
                 .map { it.key }
         }
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val sources: StateFlow<List<Source>> = repository.observeSources()
+        .map { list -> list.sortedBy { it.blogName.lowercase() } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _isLoadingSources = MutableStateFlow(true)
+    val isLoadingSources: StateFlow<Boolean> = _isLoadingSources
+
+    init {
+        viewModelScope.launch {
+            _isLoadingSources.value = true
+            repository.refreshSources()
+            _isLoadingSources.value = false
+        }
+    }
 
     val results: StateFlow<List<Article>> = combine(
         repository.observeArticles(),
@@ -70,7 +85,9 @@ class SearchViewModel @Inject constructor(
                 article.authors.any { it.lowercase().contains(q) }
             }
         }
-    }.stateIn(
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList(),

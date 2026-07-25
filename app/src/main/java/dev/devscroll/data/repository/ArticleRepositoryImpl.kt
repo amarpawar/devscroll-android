@@ -48,9 +48,9 @@ class ArticleRepositoryImpl @Inject constructor(
     override fun observeSources(): Flow<List<Source>> =
         blogDao.observeAll().map { list -> list.map { it.toDomain() } }
 
-    override suspend fun fetchArticles(page: Int, sortType: String): Result<ArticlesPage> =
+    override suspend fun fetchArticles(page: Int, sortType: String, blogId: Long?): Result<ArticlesPage> =
         runCatching {
-            val response = apiService.getArticles(page = page, sortType = sortType)
+            val response = apiService.getArticles(page = page, sortType = sortType, blogId = blogId)
             val blogEntities = response.articles.map { dto ->
                 BlogEntity(
                     blogId = dto.blogId,
@@ -68,7 +68,7 @@ class ArticleRepositoryImpl @Inject constructor(
                 val state = userStateMap[dto.articleId]
                 dto.toEntity(
                     isRead = state?.isRead ?: false,
-                    isSaved = dto.articleId in savedIds,
+                    isSaved = dto.saved || dto.articleId in savedIds,
                 )
             }
             articleDao.upsertAll(entities)
@@ -114,7 +114,7 @@ class ArticleRepositoryImpl @Inject constructor(
                 val state = userStateMap[dto.articleId]
                 dto.toSearchEntity(
                     isRead = state?.isRead ?: false,
-                    isSaved = dto.articleId in savedIds,
+                    isSaved = dto.saved || dto.articleId in savedIds,
                 )
             }
             searchArticleDao.upsertAll(entities)
@@ -194,7 +194,6 @@ class ArticleRepositoryImpl @Inject constructor(
                 isSubscribed = dto.isSubscribed
             )
         }
-        blogDao.clearAll()
-        blogDao.upsertAll(entities)
+        blogDao.replaceAll(entities)
     }
 }

@@ -65,6 +65,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.components.ArticleCard
 import dev.devscroll.ui.components.SourceBadge
 import dev.devscroll.ui.components.TagChip
+import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalToast
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -74,6 +75,7 @@ fun SearchScreen(
     onArticleClick: (Long) -> Unit,
     onBack: () -> Unit,
     onApplyTags: (List<String>) -> Unit,
+    onSourceClick: (Long) -> Unit,
     onSearch: (String) -> Unit = {},
     initialFilterTags: Set<String> = emptySet(),
     onSignInClick: () -> Unit = {},
@@ -83,6 +85,7 @@ fun SearchScreen(
     val results by viewModel.results.collectAsState()
     val topTags by viewModel.topTags.collectAsState()
     val sources by viewModel.sources.collectAsState()
+    val isLoadingSources by viewModel.isLoadingSources.collectAsState()
     val user by viewModel.userState.collectAsState()
     val savingArticles by viewModel.savingArticles.collectAsState()
     val focusRequester = remember { FocusRequester() }
@@ -200,13 +203,23 @@ fun SearchScreen(
 
         if (isIdle) {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                if (topTags.isNotEmpty()) {
-                    Text(
-                        text = "// browse by tag",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    )
+                Text(
+                    text = "// browse by tag",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+
+                if (topTags.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TerminalLoader(labels = listOf("loading tags..."))
+                    }
+                } else {
                     FlowRow(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -225,20 +238,33 @@ fun SearchScreen(
                             )
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
-                if (sources.isNotEmpty()) {
+                if (isLoadingSources || sources.isNotEmpty()) {
                     Text(
                         text = "// browse by source",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                     )
+                }
+
+                if (isLoadingSources) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TerminalLoader(labels = listOf("fetching sources..."))
+                    }
+                } else if (sources.isNotEmpty()) {
                     sources.forEach { source ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .clickable { onSourceClick(source.blogId) }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),

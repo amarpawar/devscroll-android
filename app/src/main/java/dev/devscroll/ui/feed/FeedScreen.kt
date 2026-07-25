@@ -77,6 +77,7 @@ fun FeedScreen(
     onArticleClick: (Long) -> Unit,
     onSearchClick: () -> Unit,
     onClearFilter: () -> Unit = {},
+    onClearBlogFilter: () -> Unit = {},
     onSignInClick: () -> Unit = {},
     tabClickTrigger: Long = 0L,
     viewModel: FeedViewModel = hiltViewModel(),
@@ -135,6 +136,10 @@ fun FeedScreen(
             listState.animateScrollToItem(0)
             viewModel.resetAndRefresh()
         }
+    }
+
+    LaunchedEffect(uiState.sortOrder, uiState.activeCategoryFilters, uiState.searchQuery, uiState.activeBlogFilter) {
+        listState.scrollToItem(0)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -197,6 +202,31 @@ fun FeedScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             }
 
+            if (uiState.activeBlogFilter != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "$ filter source=@${uiState.activeBlogName ?: uiState.activeBlogFilter}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { onClearBlogFilter() }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Clear source filter",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            }
+
             // Sort row
             Row(
             modifier = Modifier
@@ -241,7 +271,6 @@ fun FeedScreen(
                 modifier = Modifier
                     .clickable {
                         viewModel.toggleSort()
-                        scope.launch { listState.animateScrollToItem(0) }
                     }
                     .padding(4.dp),
             )

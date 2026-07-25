@@ -9,7 +9,7 @@ interface ArticleRepository {
     fun observeArticles(): Flow<List<Article>>
     fun observeSaved(): Flow<List<Article>>
     fun observeSources(): Flow<List<Source>>
-    suspend fun fetchArticles(page: Int, sortType: String = "NEWEST"): Result<ArticlesPage>
+    suspend fun fetchArticles(page: Int, sortType: String = "NEWEST", blogId: Long? = null): Result<ArticlesPage>
     suspend fun fetchSavedArticles(page: Int = 0): Result<ArticlesPage>
     suspend fun search(query: String, page: Int = 0): Result<ArticlesPage>
     fun observeSearchResults(): Flow<List<Article>>

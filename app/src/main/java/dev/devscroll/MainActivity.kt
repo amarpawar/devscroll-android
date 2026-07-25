@@ -229,6 +229,12 @@ class MainActivity : ComponentActivity() {
                             LaunchedEffect(filterTagsList) {
                                 feedViewModel.setFilter(filterTagsList.toSet())
                             }
+                            val filterBlogId by backStackEntry.savedStateHandle
+                                .getStateFlow<Long?>("filter_blog_id", null)
+                                .collectAsState()
+                            LaunchedEffect(filterBlogId) {
+                                feedViewModel.setBlogFilter(filterBlogId)
+                            }
                             FeedScreen(
                                 viewModel = feedViewModel,
                                 onArticleClick = { id -> navController.navigate(Screen.reader(id)) },
@@ -236,6 +242,10 @@ class MainActivity : ComponentActivity() {
                                 onClearFilter = {
                                     feedViewModel.clearFilter()
                                     backStackEntry.savedStateHandle["filter_tags"] = arrayListOf<String>()
+                                },
+                                onClearBlogFilter = {
+                                    feedViewModel.clearBlogFilter()
+                                    backStackEntry.savedStateHandle["filter_blog_id"] = null
                                 },
                                 onSignInClick = {
                                     navController.navigate(Screen.PROFILE) {
@@ -287,6 +297,10 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() },
                                 onApplyTags = { tags ->
                                     feedEntry.savedStateHandle["filter_tags"] = ArrayList(tags)
+                                },
+                                onSourceClick = { blogId ->
+                                    feedEntry.savedStateHandle["filter_blog_id"] = blogId
+                                    navController.popBackStack(Screen.FEED, inclusive = false)
                                 },
                                 onSearch = { query -> feedViewModel.search(query) },
                                 initialFilterTags = currentTags.toSet(),

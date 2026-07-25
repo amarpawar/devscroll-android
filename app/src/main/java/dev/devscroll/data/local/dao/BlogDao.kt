@@ -22,6 +22,12 @@ interface BlogDao {
     @Query("DELETE FROM blogs")
     suspend fun clearAll()
 
+    @androidx.room.Transaction
+    suspend fun replaceAll(blogs: List<BlogEntity>) {
+        clearAll()
+        upsertAll(blogs)
+    }
+
     @Query("SELECT * FROM blogs ORDER BY name ASC")
     fun observeAll(): Flow<List<BlogEntity>>
 }

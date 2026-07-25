@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
 import dev.devscroll.data.model.Article
 import kotlin.math.abs
 
@@ -165,30 +166,24 @@ private fun StandardArticleCard(
                         text = article.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
             if (article.thumbnailUrl != null) {
-                var isImageLoaded by remember(article.id) { mutableStateOf(false) }
-                val onStateChanged = remember(article.id) {
-                    { state: AsyncImagePainter.State ->
-                        isImageLoaded = state is AsyncImagePainter.State.Success
-                    }
-                }
-                Box(modifier = Modifier.size(72.dp)) {
-                    AsyncImage(
-                        model = article.thumbnailUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(72.dp),
-                        onState = onStateChanged
-                    )
-                    if (!isImageLoaded) {
+                SubcomposeAsyncImage(
+                    model = article.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(72.dp),
+                    loading = {
+                        TerminalThumbnail(seed = article.id)
+                    },
+                    error = {
                         TerminalThumbnail(seed = article.id)
                     }
-                }
+                )
             } else {
                 TerminalThumbnail(seed = article.id)
             }
@@ -337,7 +332,7 @@ private fun HotArticleCard(
                 text = article.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -389,22 +384,18 @@ private fun HotThumbnail(article: Article) {
             .border(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         if (article.thumbnailUrl != null) {
-            var isImageLoaded by remember(article.id) { mutableStateOf(false) }
-            val onStateChanged = remember(article.id) {
-                { state: AsyncImagePainter.State ->
-                    isImageLoaded = state is AsyncImagePainter.State.Success
-                }
-            }
-            AsyncImage(
+            SubcomposeAsyncImage(
                 model = article.thumbnailUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-                onState = onStateChanged
+                loading = {
+                    HotTerminalThumbnail(seed = article.id)
+                },
+                error = {
+                    HotTerminalThumbnail(seed = article.id)
+                }
             )
-            if (!isImageLoaded) {
-                HotTerminalThumbnail(seed = article.id)
-            }
         } else {
             HotTerminalThumbnail(seed = article.id)
         }

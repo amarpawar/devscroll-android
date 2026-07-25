@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import dev.devscroll.ui.PaginationConfig
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import javax.inject.Inject
 
 enum class SortOrder { NEWEST, TRENDING }
@@ -35,6 +36,8 @@ data class FeedUiState(
     val isBatchLimitReached: Boolean = false,
     val isSearchActive: Boolean = false,
     val searchQuery: String = "",
+    val activeBlogFilter: Long? = null,
+    val activeBlogName: String? = null,
 )
 
 private data class LoadState(
@@ -68,10 +71,12 @@ class FeedViewModel @Inject constructor(
         )
 
     private val categoryFilters = MutableStateFlow<Set<String>>(emptySet())
+    private val blogFilter = MutableStateFlow<Long?>(null)
     private val sortOrder = MutableStateFlow(SortOrder.NEWEST)
     private val loadState = MutableStateFlow(LoadState())
     private var currentPage = 0
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val articleSource = loadState
         .map { it.searchQuery }
         .distinctUntilChanged()
@@ -96,11 +101,13 @@ class FeedViewModel @Inject constructor(
         categoryFilters,
         sortOrder,
         searchActive,
-    ) { articles, filters, sort, isSearchActive ->
+        blogFilter,
+    ) { articles, filters, sort, isSearchActive, blogId ->
         if (isSearchActive) {
             articles
         } else {
             articles
+                .filter { blogId == null || it.blogId == blogId }
                 .filter { filters.isEmpty() || it.categories.any { cat -> cat in filters } }
                 .let { list ->
                     when (sort) {
@@ -111,12 +118,21 @@ class FeedViewModel @Inject constructor(
         }
     }.flowOn(Dispatchers.Default)
 
+    private val activeBlogState = combine(
+        blogFilter,
+        repository.observeSources()
+    ) { blogId, sources ->
+        val name = if (blogId == null) null else sources.find { it.blogId == blogId }?.blogName
+        blogId to name
+    }
+
     val uiState: StateFlow<FeedUiState> = combine(
         processedArticles,
         categoryFilters,
         sortOrder,
         loadState,
-    ) { articles, filters, sort, load ->
+        activeBlogState,
+    ) { articles, filters, sort, load, blogState ->
         val isSearchActive = load.searchQuery != null
         val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
         FeedUiState(
@@ -130,6 +146,8 @@ class FeedViewModel @Inject constructor(
             isBatchLimitReached = limitReached,
             isSearchActive = isSearchActive,
             searchQuery = load.searchQuery ?: "",
+            activeBlogFilter = blogState.first,
+            activeBlogName = blogState.second,
         )
     }
         .stateIn(
@@ -152,7 +170,7 @@ class FeedViewModel @Inject constructor(
             currentPage = 0
             loadState.update { it.copy(isRefreshing = true, error = null) }
             repository.clearFeedArticles()
-            repository.fetchArticles(page = 0, sortType = sortOrder.value.name)
+            repository.fetchArticles(page = 0, sortType = sortOrder.value.name, blogId = blogFilter.value)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
                 }
@@ -197,7 +215,7 @@ class FeedViewModel @Inject constructor(
             val result = if (state.searchQuery != null) {
                 repository.search(query = state.searchQuery, page = currentPage)
             } else {
-                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name)
+                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name, blogId = blogFilter.value)
             }
             result
                 .onSuccess { page ->
@@ -227,7 +245,7 @@ class FeedViewModel @Inject constructor(
             val result = if (state.searchQuery != null) {
                 repository.search(query = state.searchQuery, page = currentPage)
             } else {
-                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name)
+                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name, blogId = blogFilter.value)
             }
             result
                 .onSuccess { page ->
@@ -246,7 +264,7 @@ class FeedViewModel @Inject constructor(
             loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = null) }
             repository.clearFeedArticles()
             repository.clearSearchResults()
-            repository.fetchArticles(page = 0, sortType = sortOrder.value.name)
+            repository.fetchArticles(page = 0, sortType = sortOrder.value.name, blogId = blogFilter.value)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
                 }
@@ -261,6 +279,20 @@ class FeedViewModel @Inject constructor(
 
     fun setFilter(tags: Set<String>) { categoryFilters.value = tags }
     fun clearFilter() { categoryFilters.value = emptySet() }
+
+    fun setBlogFilter(blogId: Long?) {
+        if (this.blogFilter.value != blogId) {
+            this.blogFilter.value = blogId
+            resetAndRefresh()
+        }
+    }
+
+    fun clearBlogFilter() {
+        if (this.blogFilter.value != null) {
+            this.blogFilter.value = null
+            resetAndRefresh()
+        }
+    }
 
     fun toggleSort() {
         sortOrder.update { if (it == SortOrder.NEWEST) SortOrder.TRENDING else SortOrder.NEWEST }

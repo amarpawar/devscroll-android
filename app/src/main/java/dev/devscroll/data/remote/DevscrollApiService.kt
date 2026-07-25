@@ -16,6 +16,7 @@ interface DevscrollApiService {
         @Query("page") page: Int,
         @Query("size") size: Int = 20,
         @Query("sortType") sortType: String = "NEWEST",
+        @Query("blogId") blogId: Long? = null,
     ): ArticlesPageDto
 
     @GET("devscroll/api/blog")

@@ -40,5 +40,5 @@ data class UserProfileDto(
     @SerializedName("profilePicUrl") val pictureUrl: String?,
     @SerializedName("savedArticlesCount") val savedArticlesCount: Int? = 0,
     @SerializedName("subscriptionsCount") val subscriptionsCount: Int? = 0,
-    @SerializedName("streakCount") val streakCount: Int? = 0
+    @SerializedName("currentStreak") val streakCount: Int? = 0
 )

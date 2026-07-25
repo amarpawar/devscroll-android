@@ -27,6 +27,7 @@ data class ArticleDto(
     val thumbnailUrl: String?,
     val title: String,
     val url: String,
+    val saved: Boolean = false,
 )
 
 data class ArticlesPageDto(
