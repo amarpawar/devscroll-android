@@ -44,10 +44,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         resValue("string", "google_web_client_id", secret("GOOGLE_WEB_CLIENT_ID"))
-        resValue("string", "facebook_app_id", secret("FACEBOOK_APP_ID"))
-        resValue("string", "facebook_client_token", secret("FACEBOOK_CLIENT_TOKEN"))
-        // Facebook's login redirect scheme is fb<app-id>.
-        resValue("string", "facebook_login_protocol_scheme", "fb${secret("FACEBOOK_APP_ID")}")
     }
 
     // Only configured when the keystore is actually present, so fresh clones and CI
@@ -152,13 +148,13 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
-    implementation(libs.facebook.login)
 
     // Crash reporting. Always on the classpath so CrashReporter compiles; actual
     // collection depends on google-services.json being present (see above).
+    // Deliberately no firebase-analytics: it collects the advertising ID, which the
+    // privacy policy disclaims and which would require an EU consent gate.
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.analytics)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

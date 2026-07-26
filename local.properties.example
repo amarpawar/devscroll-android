@@ -5,9 +5,6 @@
 # Google OAuth web client ID (Google Cloud console > Credentials).
 GOOGLE_WEB_CLIENT_ID=
 
-# Meta app ID and client token (developers.facebook.com > Settings > Advanced).
-FACEBOOK_APP_ID=
-FACEBOOK_CLIENT_TOKEN=
 
 # Release signing. Path is relative to the repo root. Leave blank for debug-only
 # work — release builds then produce an unsigned APK instead of failing the build.

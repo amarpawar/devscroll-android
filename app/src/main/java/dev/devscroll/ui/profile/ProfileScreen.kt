@@ -71,7 +71,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.credentials.exceptions.GetCredentialCancellationException
-import com.facebook.CallbackManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -152,8 +151,6 @@ private fun LoggedInDashboard(
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val activity = remember(context) { context.findComponentActivity() }
-    val facebookCallbackManager = remember { CallbackManager.Factory.create() }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
@@ -181,7 +178,6 @@ private fun LoggedInDashboard(
             message = "this removes your saves, subscriptions and streak. it cannot be undone.",
             reauthHint = when (user.provider) {
                 "google" -> "confirm with google to continue"
-                "facebook" -> "confirm with facebook to continue"
                 else -> "re-enter your password to continue"
             },
             confirmLabel = "delete",
@@ -200,12 +196,6 @@ private fun LoggedInDashboard(
                         // server verifies it before deleting anything.
                         val request = when (user.provider) {
                             "google" -> DeleteAccountRequest(idToken = requestGoogleIdToken(context))
-                            "facebook" -> {
-                                val act = activity ?: error("Facebook re-auth unavailable")
-                                DeleteAccountRequest(
-                                    accessToken = requestFacebookAccessToken(act, facebookCallbackManager)
-                                )
-                            }
                             else -> DeleteAccountRequest(password = deletePassword)
                         }
                         showDeleteDialog = false
@@ -213,8 +203,6 @@ private fun LoggedInDashboard(
                         profileViewModel.deleteAccount(request)
                     } catch (e: GetCredentialCancellationException) {
                         // Backed out of the sheet; leave the dialog open.
-                    } catch (e: AuthCancelledException) {
-                        // Same.
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -662,7 +650,6 @@ private fun ProfileActionRow(
 /** Maps the stored provider id onto what the user actually sees. */
 private fun String.providerLabel(): String = when (this) {
     "google" -> "google"
-    "facebook" -> "facebook"
     else -> "email"
 }
 
@@ -677,11 +664,6 @@ private fun LoggedOutView(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
-    // Facebook Login drives its result through the host activity's
-    // ActivityResultRegistry, so it needs the ComponentActivity, not the raw context.
-    val activity = remember(context) { context.findComponentActivity() }
-    val facebookCallbackManager = remember { CallbackManager.Factory.create() }
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var email by remember { mutableStateOf("") }
@@ -793,38 +775,6 @@ private fun LoggedOutView(
                                 throw e
                             } catch (e: Exception) {
                                 profileViewModel.onAuthError(e.message ?: "Google Sign-In failed")
-                            }
-                        }
-                    }
-                }
-            )
-            SocialButton(
-                label = "continue with facebook",
-                icon = {
-                    androidx.compose.material3.Icon(
-                        painterResource(R.drawable.ic_facebook),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = Color.Unspecified
-                    )
-                },
-                onClick = {
-                    if (!isLoading) {
-                        if (activity == null) {
-                            profileViewModel.onAuthError("Facebook Sign-In unavailable")
-                        } else {
-                            coroutineScope.launch {
-                                try {
-                                    profileViewModel.loginWithFacebook(
-                                        requestFacebookAccessToken(activity, facebookCallbackManager)
-                                    )
-                                } catch (e: AuthCancelledException) {
-                                    // User backed out.
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (e: Exception) {
-                                    profileViewModel.onAuthError(e.message ?: "Facebook Sign-In failed")
-                                }
                             }
                         }
                     }
