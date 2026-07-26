@@ -1,10 +1,12 @@
 package dev.devscroll.data.remote
 
 import dev.devscroll.data.remote.dto.*
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -67,6 +69,14 @@ interface DevscrollApiService {
 
     @GET("devscroll/api/users/me")
     suspend fun getUserProfile(): UserProfileDto
+
+    // @HTTP rather than @DELETE: Retrofit only sends a body when hasBody is set.
+    // The body carries the reauth credential the server must verify before deleting.
+    @HTTP(method = "DELETE", path = "devscroll/api/users/me", hasBody = true)
+    suspend fun deleteAccount(@Body request: DeleteAccountRequest): Response<Unit>
+
+    @GET("devscroll/api/users/me/export")
+    suspend fun exportUserData(): ResponseBody
 
     @POST("devscroll/api/users/me/unsubscriptions/{blogId}")
     suspend fun unsubscribeBlog(@Path("blogId") blogId: Long)

@@ -1,5 +1,6 @@
 package dev.devscroll.data.repository
 
+import dev.devscroll.data.local.DatabaseInitializer
 import dev.devscroll.data.local.dao.ArticleDao
 import dev.devscroll.data.local.dao.BlogDao
 import dev.devscroll.data.local.dao.SavedArticleDao
@@ -14,6 +15,7 @@ import dev.devscroll.data.remote.DevscrollApiService
 import dev.devscroll.data.remote.dto.toEntity
 import dev.devscroll.data.remote.dto.toSavedEntity
 import dev.devscroll.data.remote.dto.toSearchEntity
+import dev.devscroll.util.CrashReporter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -30,6 +32,8 @@ class ArticleRepositoryImpl @Inject constructor(
     private val savedArticleDao: SavedArticleDao,
     private val searchArticleDao: SearchArticleDao,
     private val blogDao: BlogDao,
+    private val databaseInitializer: DatabaseInitializer,
+    private val crashReporter: CrashReporter,
 ) : ArticleRepository {
     private val savingIds = MutableStateFlow<Set<Long>>(emptySet())
 
@@ -50,6 +54,7 @@ class ArticleRepositoryImpl @Inject constructor(
 
     override suspend fun fetchArticles(page: Int, sortType: String, blogId: Long?): Result<ArticlesPage> =
         runCatching {
+            databaseInitializer.awaitReady()
             val response = apiService.getArticles(page = page, sortType = sortType, blogId = blogId)
             val blogEntities = response.articles.map { dto ->
                 BlogEntity(
@@ -77,6 +82,7 @@ class ArticleRepositoryImpl @Inject constructor(
 
     override suspend fun fetchSavedArticles(page: Int): Result<ArticlesPage> =
         runCatching {
+            databaseInitializer.awaitReady()
             val response = apiService.getSavedArticles(page = page)
             val savedAt = System.currentTimeMillis()
             if (page == 0) {
@@ -95,6 +101,7 @@ class ArticleRepositoryImpl @Inject constructor(
 
     override suspend fun search(query: String, page: Int): Result<ArticlesPage> =
         runCatching {
+            databaseInitializer.awaitReady()
             if (page == 0) searchArticleDao.clearAll()
             val response = apiService.searchArticles(query = query, page = page)
             val blogEntities = response.articles.map { dto ->
@@ -140,31 +147,49 @@ class ArticleRepositoryImpl @Inject constructor(
         searchArticleDao.markRead(id)
     }
 
-    override suspend fun toggleSave(id: Long) {
-        val article = getArticle(id) ?: return
+    override suspend fun toggleSave(id: Long): Result<Unit> {
+        val article = getArticle(id)
+            ?: return Result.failure(IllegalStateException("Article $id not found"))
         val currentlySaved = article.isSaved
         savingIds.update { it + id }
         try {
-            if (currentlySaved) {
-                runCatching { apiService.unsaveArticle(id) }
-                articleDao.setSaved(id, false)
-                searchArticleDao.setSaved(id, false)
-                savedArticleDao.delete(id)
-            } else {
-                runCatching { apiService.saveArticle(id) }
-                articleDao.setSaved(id, true)
-                searchArticleDao.setSaved(id, true)
-                val savedEntity = article.toSavedLocalEntity(savedAt = System.currentTimeMillis())
-                savedArticleDao.upsert(savedEntity)
+            // Write locally first so the bookmark reacts immediately, then roll back
+            // if the server rejects it — otherwise local state silently diverges.
+            applySavedLocally(article, saved = !currentlySaved)
+            val apiResult = runCatching {
+                if (currentlySaved) apiService.unsaveArticle(id) else apiService.saveArticle(id)
             }
+            return apiResult.fold(
+                onSuccess = { Result.success(Unit) },
+                onFailure = { error ->
+                    applySavedLocally(article, saved = currentlySaved)
+                    crashReporter.recordNonFatal(error, "Save toggle rejected — rolled back")
+                    Result.failure(error)
+                },
+            )
         } finally {
             savingIds.update { it - id }
         }
     }
 
-    override suspend fun getArticle(id: Long): Article? =
-        articleDao.getById(id)?.toDomain()
+    private suspend fun applySavedLocally(article: Article, saved: Boolean) {
+        articleDao.setSaved(article.id, saved)
+        searchArticleDao.setSaved(article.id, saved)
+        if (saved) {
+            savedArticleDao.upsert(article.toSavedLocalEntity(savedAt = System.currentTimeMillis()))
+        } else {
+            savedArticleDao.delete(article.id)
+        }
+    }
+
+    override suspend fun getArticle(id: Long): Article? {
+        databaseInitializer.awaitReady()
+        // saved_articles is the only table populated on the Saved tab, so it has to
+        // be part of the lookup or saved articles cannot be opened in the reader.
+        return articleDao.getById(id)?.toDomain()
             ?: searchArticleDao.getById(id)?.toDomain()
+            ?: savedArticleDao.getById(id)?.toDomain()
+    }
 
     override suspend fun recordArticleHit(articleId: Long): Result<Unit> = runCatching {
         apiService.recordArticleHit(articleId)

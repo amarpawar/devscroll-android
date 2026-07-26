@@ -1,5 +1,7 @@
 package dev.devscroll.ui.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,6 +44,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.R
 import coil.compose.SubcomposeAsyncImage
+import dev.devscroll.data.remote.dto.DeleteAccountRequest
+import dev.devscroll.navigation.ExternalLinks
+import dev.devscroll.navigation.openUrl
+import dev.devscroll.ui.components.TerminalConfirmDialog
 import dev.devscroll.ui.components.TopBar
 import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.theme.ThemeViewModel
@@ -54,18 +60,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.credentials.CredentialManager
-import androidx.credentials.GetCredentialRequest
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import com.facebook.CallbackManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -98,7 +105,8 @@ fun ProfileScreen(
                 isRefreshing = state.isRefreshing,
                 onRefresh = { profileViewModel.refreshProfile() },
                 onLogout = { profileViewModel.logout() },
-                themeViewModel = themeViewModel
+                themeViewModel = themeViewModel,
+                profileViewModel = profileViewModel,
             )
         }
         is AuthUiState.LoggedOut -> {
@@ -135,11 +143,91 @@ private fun LoggedInDashboard(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
-    themeViewModel: ThemeViewModel
+    themeViewModel: ThemeViewModel,
+    profileViewModel: ProfileViewModel,
 ) {
     val themeState by themeViewModel.themeState.collectAsState()
     val isDark = themeState.isDark
     val currentAccent = themeState.accentColor
+
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val activity = remember(context) { context.findComponentActivity() }
+    val facebookCallbackManager = remember { CallbackManager.Factory.create() }
+
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var deletePassword by remember { mutableStateOf("") }
+    var isDeleting by remember { mutableStateOf(false) }
+
+    val isExporting by profileViewModel.isExporting.collectAsState()
+    val exportMessage by profileViewModel.exportMessage.collectAsState()
+
+    // The system picker owns the destination, so no storage permission is needed.
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) profileViewModel.exportUserData(uri) }
+
+    LaunchedEffect(exportMessage) {
+        if (exportMessage != null) {
+            kotlinx.coroutines.delay(2500)
+            profileViewModel.clearExportMessage()
+        }
+    }
+
+    if (showDeleteDialog) {
+        val isPasswordAccount = user.provider == "username/password"
+        TerminalConfirmDialog(
+            title = "delete account — irreversible",
+            message = "this removes your saves, subscriptions and streak. it cannot be undone.",
+            reauthHint = when (user.provider) {
+                "google" -> "confirm with google to continue"
+                "facebook" -> "confirm with facebook to continue"
+                else -> "re-enter your password to continue"
+            },
+            confirmLabel = "delete",
+            isBusy = isDeleting,
+            passwordValue = if (isPasswordAccount) deletePassword else null,
+            onPasswordChange = { deletePassword = it },
+            onDismiss = {
+                showDeleteDialog = false
+                deletePassword = ""
+            },
+            onConfirm = {
+                coroutineScope.launch {
+                    isDeleting = true
+                    try {
+                        // A freshly minted credential, not the stored session — the
+                        // server verifies it before deleting anything.
+                        val request = when (user.provider) {
+                            "google" -> DeleteAccountRequest(idToken = requestGoogleIdToken(context))
+                            "facebook" -> {
+                                val act = activity ?: error("Facebook re-auth unavailable")
+                                DeleteAccountRequest(
+                                    accessToken = requestFacebookAccessToken(act, facebookCallbackManager)
+                                )
+                            }
+                            else -> DeleteAccountRequest(password = deletePassword)
+                        }
+                        showDeleteDialog = false
+                        deletePassword = ""
+                        profileViewModel.deleteAccount(request)
+                    } catch (e: GetCredentialCancellationException) {
+                        // Backed out of the sheet; leave the dialog open.
+                    } catch (e: AuthCancelledException) {
+                        // Same.
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        showDeleteDialog = false
+                        deletePassword = ""
+                        profileViewModel.onAuthError(e.message ?: "Re-authentication failed")
+                    } finally {
+                        isDeleting = false
+                    }
+                }
+            },
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(
@@ -462,23 +550,22 @@ private fun LoggedInDashboard(
                 )
 
                 ProfileActionRow(
-                    title = "email preferences",
-                    subtitle = "manage digests and alerts",
-                    onClick = {}
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
-                ProfileActionRow(
                     title = "connected accounts",
-                    subtitle = "google · linked",
-                    onClick = {}
+                    subtitle = "${user.provider.providerLabel()} · linked",
+                    onClick = null,
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                 ProfileActionRow(
                     title = "export data",
-                    subtitle = "download your saves + subs as .json",
-                    onClick = {}
+                    subtitle = if (isExporting) {
+                        "exporting..."
+                    } else {
+                        exportMessage ?: "download your saves + subs as .json"
+                    },
+                    onClick = {
+                        if (!isExporting) exportLauncher.launch("devscroll-export.json")
+                    }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
@@ -492,7 +579,7 @@ private fun LoggedInDashboard(
                 ProfileActionRow(
                     title = "delete account",
                     subtitle = "permanent — cannot be undone",
-                    onClick = {},
+                    onClick = { showDeleteDialog = true },
                     titleColor = MaterialTheme.colorScheme.error
                 )
             }
@@ -515,7 +602,14 @@ private fun LoggedInDashboard(
                 ProfileActionRow(
                     title = "terms of service",
                     subtitle = "read our privacy policies and terms of usage",
-                    onClick = {}
+                    onClick = { context.openUrl(ExternalLinks.TERMS) }
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+                ProfileActionRow(
+                    title = "privacy policy",
+                    subtitle = "how your data is handled",
+                    onClick = { context.openUrl(ExternalLinks.PRIVACY) }
                 )
             }
         }
@@ -527,13 +621,13 @@ private fun LoggedInDashboard(
 private fun ProfileActionRow(
     title: String,
     subtitle: String,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     titleColor: Color = MaterialTheme.colorScheme.onBackground
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
             .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -553,13 +647,23 @@ private fun ProfileActionRow(
             )
         }
         
-        androidx.compose.material3.Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = "Navigate",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
+        // No chevron on informational rows — it would imply a tap target that isn't there.
+        if (onClick != null) {
+            androidx.compose.material3.Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Navigate",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
+}
+
+/** Maps the stored provider id onto what the user actually sees. */
+private fun String.providerLabel(): String = when (this) {
+    "google" -> "google"
+    "facebook" -> "facebook"
+    else -> "email"
 }
 
 @Composable
@@ -573,6 +677,12 @@ private fun LoggedOutView(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    // Facebook Login drives its result through the host activity's
+    // ActivityResultRegistry, so it needs the ComponentActivity, not the raw context.
+    val activity = remember(context) { context.findComponentActivity() }
+    val facebookCallbackManager = remember { CallbackManager.Factory.create() }
+
     var selectedTab by remember { mutableIntStateOf(0) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -676,34 +786,13 @@ private fun LoggedOutView(
                     if (!isLoading) {
                         coroutineScope.launch {
                             try {
-                                val credentialManager = CredentialManager.create(context)
-                                
-                                // Web Client ID is supplied by the backend. Loaded dynamically from string resources.
-                                val googleIdOption = GetGoogleIdOption.Builder()
-                                    .setFilterByAuthorizedAccounts(false)
-                                    .setServerClientId(context.getString(R.string.google_web_client_id))
-                                    .setAutoSelectEnabled(false)
-                                    .build()
-
-                                val request = GetCredentialRequest.Builder()
-                                    .addCredentialOption(googleIdOption)
-                                    .build()
-
-                                val result = credentialManager.getCredential(
-                                    context = context,
-                                    request = request
-                                )
-
-                                val credential = result.credential
-                                if (credential is androidx.credentials.CustomCredential &&
-                                    credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                                ) {
-                                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                                    val idToken = googleIdTokenCredential.idToken
-                                    profileViewModel.loginWithGoogle(idToken)
-                                }
+                                profileViewModel.loginWithGoogle(requestGoogleIdToken(context))
+                            } catch (e: GetCredentialCancellationException) {
+                                // User dismissed the sheet; not an error worth showing.
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
-                                e.printStackTrace()
+                                profileViewModel.onAuthError(e.message ?: "Google Sign-In failed")
                             }
                         }
                     }
@@ -721,7 +810,23 @@ private fun LoggedOutView(
                 },
                 onClick = {
                     if (!isLoading) {
-                        profileViewModel.loginWithFacebook(context.getString(R.string.facebook_client_token))
+                        if (activity == null) {
+                            profileViewModel.onAuthError("Facebook Sign-In unavailable")
+                        } else {
+                            coroutineScope.launch {
+                                try {
+                                    profileViewModel.loginWithFacebook(
+                                        requestFacebookAccessToken(activity, facebookCallbackManager)
+                                    )
+                                } catch (e: AuthCancelledException) {
+                                    // User backed out.
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    profileViewModel.onAuthError(e.message ?: "Facebook Sign-In failed")
+                                }
+                            }
+                        }
                     }
                 }
             )
@@ -862,18 +967,24 @@ private fun LoggedOutView(
             // Footer
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
+                    // These were styled as links but weren't clickable — the user is being
+                    // asked to agree to documents they had no way to open.
                     text = buildAnnotatedString {
                         withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                             append("// by continuing you agree to ")
                         }
-                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
-                            append("terms")
+                        withLink(LinkAnnotation.Url(ExternalLinks.TERMS)) {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                                append("terms")
+                            }
                         }
                         withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                             append(" and ")
                         }
-                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
-                            append("privacy")
+                        withLink(LinkAnnotation.Url(ExternalLinks.PRIVACY)) {
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) {
+                                append("privacy")
+                            }
                         }
                         withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                             append(".")

@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -24,6 +26,15 @@ data class SavedUiState(
     val hasNext: Boolean = false,
     val error: String? = null,
     val isBatchLimitReached: Boolean = false,
+)
+
+private data class SavedLoadState(
+    val isRefreshing: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasNext: Boolean = false,
+    val error: String? = null,
+    // Kept in the flow rather than a plain field so isBatchLimitReached recomputes.
+    val page: Int = 0,
 )
 
 @HiltViewModel
@@ -46,8 +57,7 @@ class SavedViewModel @Inject constructor(
             initialValue = emptySet(),
         )
 
-    private val loadState = MutableStateFlow(SavedUiState())
-    private var currentPage = 0
+    private val loadState = MutableStateFlow(SavedLoadState())
 
     val articles: StateFlow<List<Article>> = repository.observeSaved()
         .stateIn(
@@ -60,8 +70,14 @@ class SavedViewModel @Inject constructor(
         articles,
         loadState
     ) { articleList, loading ->
-        val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
-        loading.copy(articles = articleList, isBatchLimitReached = limitReached)
+        SavedUiState(
+            articles = articleList,
+            isRefreshing = loading.isRefreshing,
+            isLoadingMore = loading.isLoadingMore,
+            hasNext = loading.hasNext,
+            error = loading.error,
+            isBatchLimitReached = (loading.page + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0,
+        )
     }
     .stateIn(
         scope = viewModelScope,
@@ -71,19 +87,19 @@ class SavedViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            userState.collect { user ->
-                if (user != null) {
-                    refresh()
-                }
-            }
+            // userState re-emits on any profile write (streak, saved count, ...).
+            // Only the transition into a signed-in session should trigger a refetch.
+            userState
+                .map { it != null }
+                .distinctUntilChanged()
+                .collect { isSignedIn -> if (isSignedIn) refresh() }
         }
     }
 
     fun refresh() {
         if (userState.value == null) return
         viewModelScope.launch {
-            currentPage = 0
-            loadState.update { it.copy(isRefreshing = true, error = null) }
+            loadState.update { it.copy(isRefreshing = true, error = null, page = 0) }
             repository.clearSavedArticlesCache()
             repository.fetchSavedArticles(page = 0)
                 .onSuccess { page ->
@@ -98,19 +114,18 @@ class SavedViewModel @Inject constructor(
     fun loadNextPage() {
         val state = loadState.value
         if (state.isLoadingMore || state.isRefreshing || !state.hasNext || userState.value == null) return
-        val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
+        val limitReached = (state.page + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
         if (limitReached) return
 
+        val nextPage = state.page + 1
         viewModelScope.launch {
-            currentPage++
-            loadState.update { it.copy(isLoadingMore = true) }
-            repository.fetchSavedArticles(page = currentPage)
+            loadState.update { it.copy(isLoadingMore = true, page = nextPage) }
+            repository.fetchSavedArticles(page = nextPage)
                 .onSuccess { page ->
                     loadState.update { it.copy(isLoadingMore = false, hasNext = page.hasNext) }
                 }
                 .onFailure { e ->
-                    currentPage--
-                    loadState.update { it.copy(isLoadingMore = false, error = e.message) }
+                    loadState.update { it.copy(isLoadingMore = false, error = e.message, page = state.page) }
                 }
         }
     }
@@ -118,17 +133,16 @@ class SavedViewModel @Inject constructor(
     fun loadNextBatch() {
         val state = loadState.value
         if (state.isLoadingMore || state.isRefreshing || !state.hasNext || userState.value == null) return
+        val nextPage = state.page + 1
         viewModelScope.launch {
-            currentPage++
-            loadState.update { it.copy(isRefreshing = true, error = null) }
+            loadState.update { it.copy(isRefreshing = true, error = null, page = nextPage) }
             repository.clearSavedArticlesCache()
-            repository.fetchSavedArticles(page = currentPage)
+            repository.fetchSavedArticles(page = nextPage)
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
                 }
                 .onFailure { e ->
-                    currentPage--
-                    loadState.update { it.copy(isRefreshing = false, error = e.message) }
+                    loadState.update { it.copy(isRefreshing = false, error = e.message, page = state.page) }
                 }
         }
     }
@@ -136,8 +150,7 @@ class SavedViewModel @Inject constructor(
     fun resetAndRefresh() {
         if (userState.value == null) return
         viewModelScope.launch {
-            currentPage = 0
-            loadState.update { it.copy(isRefreshing = true, error = null) }
+            loadState.update { it.copy(isRefreshing = true, error = null, page = 0) }
             repository.clearSavedArticlesCache()
             repository.fetchSavedArticles(page = 0)
                 .onSuccess { page ->
@@ -150,6 +163,10 @@ class SavedViewModel @Inject constructor(
     }
 
     fun toggleSave(id: Long) {
-        viewModelScope.launch { repository.toggleSave(id) }
+        viewModelScope.launch {
+            repository.toggleSave(id).onFailure { e ->
+                loadState.update { it.copy(error = e.message ?: "Could not update bookmark") }
+            }
+        }
     }
 }

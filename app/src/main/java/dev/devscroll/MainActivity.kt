@@ -34,10 +34,6 @@ import dev.devscroll.ui.components.BottomNavBar
 import dev.devscroll.data.local.AuthPreferences
 import dev.devscroll.data.model.User
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import dev.devscroll.data.local.AppDatabase
 import dev.devscroll.ui.feed.FeedScreen
 import dev.devscroll.ui.feed.FeedViewModel
 import dev.devscroll.ui.profile.ProfileScreen
@@ -55,15 +51,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var themePreferences: ThemePreferences
     @Inject lateinit var authPreferences: AuthPreferences
-    @Inject lateinit var appDatabase: AppDatabase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Clear Room DB on app process start to keep caching session-only
-        lifecycleScope.launch(Dispatchers.IO) {
-            appDatabase.clearAllTables()
-        }
 
         enableEdgeToEdge()
         setContent {

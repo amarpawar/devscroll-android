@@ -7,8 +7,12 @@ import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.devscroll.data.model.User
 import dev.devscroll.data.remote.dto.TokenPair
+import dev.devscroll.di.ApplicationScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,6 +21,7 @@ private val Context.dataStore by preferencesDataStore(name = "auth_prefs")
 @Singleton
 class AuthPreferences @Inject constructor(
     @ApplicationContext private val context: Context,
+    @ApplicationScope private val scope: CoroutineScope,
 ) {
     private val accessTokenKey = stringPreferencesKey("access_token")
     private val refreshTokenKey = stringPreferencesKey("refresh_token")
@@ -30,6 +35,22 @@ class AuthPreferences @Inject constructor(
 
     val accessToken: Flow<String?> = context.dataStore.data.map { prefs ->
         prefs[accessTokenKey]
+    }
+
+    /**
+     * Mirror of [accessToken] readable without suspending. AuthInterceptor runs on an
+     * OkHttp thread for every request; reading DataStore there meant a disk read plus
+     * proto deserialization per call.
+     */
+    @Volatile
+    private var cachedAccessToken: String? = null
+
+    fun cachedToken(): String? = cachedAccessToken
+
+    init {
+        accessToken
+            .onEach { cachedAccessToken = it }
+            .launchIn(scope)
     }
 
     val refreshToken: Flow<String?> = context.dataStore.data.map { prefs ->
@@ -60,6 +81,8 @@ class AuthPreferences @Inject constructor(
     }
 
     suspend fun saveTokens(tokens: TokenPair) {
+        // Set eagerly so a request issued before the flow round-trips uses the new token.
+        cachedAccessToken = tokens.accessToken
         context.dataStore.edit { prefs ->
             prefs[accessTokenKey] = tokens.accessToken
             prefs[refreshTokenKey] = tokens.refreshToken
@@ -87,6 +110,7 @@ class AuthPreferences @Inject constructor(
     }
 
     suspend fun clearSession() {
+        cachedAccessToken = null
         context.dataStore.edit { prefs ->
             prefs.clear()
         }

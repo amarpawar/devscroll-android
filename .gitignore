@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Signing keys. A committed keystore cannot be un-committed — losing control of it
+# means losing control of app updates.
+*.jks
+*.keystore
+
+# Firebase config; contains project identifiers tied to this app.
+google-services.json

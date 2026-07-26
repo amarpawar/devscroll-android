@@ -5,17 +5,30 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep line numbers in crash reports, but hide original file names.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# --- Gson ---------------------------------------------------------------
+# DTOs are populated reflectively by field name, so their names must survive.
+-keep class dev.devscroll.data.remote.dto.** { *; }
+-keepattributes Signature,*Annotation*
+-keepclassmembers,allowobfuscation class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+# TypeToken relies on generic signatures at runtime.
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# --- Room ---------------------------------------------------------------
+# Entities are mapped by column/field name by generated code.
+-keep class dev.devscroll.data.local.entity.** { *; }
+-keep class dev.devscroll.data.local.dao.** { *; }
+
+# --- Retrofit / OkHttp --------------------------------------------------
+-keepattributes RuntimeVisibleAnnotations,RuntimeVisibleParameterAnnotations
+-keep,allowobfuscation interface dev.devscroll.data.remote.*ApiService
+-dontwarn okhttp3.internal.platform.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**

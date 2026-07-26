@@ -1,16 +1,24 @@
 package dev.devscroll.ui.profile
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.devscroll.data.model.User
+import dev.devscroll.data.remote.dto.DeleteAccountRequest
 import dev.devscroll.data.repository.AuthRepository
+import dev.devscroll.data.repository.InvalidCredentialException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 sealed interface AuthUiState {
@@ -23,11 +31,20 @@ sealed interface AuthUiState {
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
+
+    private val contentResolver get() = appContext.contentResolver
 
     private val _localState = MutableStateFlow<AuthUiState?>(null)
     private val _isRefreshing = MutableStateFlow(false)
+
+    private val _isExporting = MutableStateFlow(false)
+    val isExporting: StateFlow<Boolean> = _isExporting.asStateFlow()
+
+    private val _exportMessage = MutableStateFlow<String?>(null)
+    val exportMessage: StateFlow<String?> = _exportMessage.asStateFlow()
 
     val uiState: StateFlow<AuthUiState> = combine(
         authRepository.userState,
@@ -118,6 +135,56 @@ class ProfileViewModel @Inject constructor(
             _isRefreshing.value = false
         }
     }
+
+    /** Surfaces failures raised by the credential UIs before a repository call happens. */
+    fun onAuthError(message: String) {
+        _localState.value = AuthUiState.Error(message)
+    }
+
+    /**
+     * Deletes the account after the server has verified [request]'s fresh credential.
+     * On failure nothing is destroyed — the user stays signed in.
+     */
+    fun deleteAccount(request: DeleteAccountRequest) {
+        viewModelScope.launch {
+            _localState.value = AuthUiState.Authenticating
+            authRepository.deleteAccount(request)
+                .onSuccess {
+                    // userState goes null on its own once the session is cleared.
+                    _localState.value = null
+                }
+                .onFailure { error ->
+                    _localState.value = AuthUiState.Error(
+                        when (error) {
+                            is InvalidCredentialException -> error.message!!
+                            else -> error.message ?: "Could not delete account"
+                        }
+                    )
+                }
+        }
+    }
+
+    fun exportUserData(destination: Uri) {
+        viewModelScope.launch {
+            _isExporting.value = true
+            val result = authRepository.exportUserData().mapCatching { body ->
+                // Streamed rather than buffered: the export can be arbitrarily large.
+                withContext(Dispatchers.IO) {
+                    body.byteStream().use { input ->
+                        contentResolver.openOutputStream(destination)?.use { output ->
+                            input.copyTo(output)
+                        } ?: throw IllegalStateException("Could not open ${destination.lastPathSegment}")
+                    }
+                }
+            }
+            _isExporting.value = false
+            result
+                .onSuccess { _exportMessage.value = "export saved" }
+                .onFailure { _localState.value = AuthUiState.Error(it.message ?: "Export failed") }
+        }
+    }
+
+    fun clearExportMessage() { _exportMessage.value = null }
 
     fun clearError() {
         _localState.value = null

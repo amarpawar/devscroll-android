@@ -28,6 +28,17 @@ data class LogoutRequest(
     @SerializedName("refreshToken") val refreshToken: String
 )
 
+/**
+ * Carries a freshly obtained credential so the server can verify the user really is
+ * present before an irreversible delete. Exactly one field is populated, chosen by the
+ * provider the account was created with.
+ */
+data class DeleteAccountRequest(
+    @SerializedName("password") val password: String? = null,
+    @SerializedName("idToken") val idToken: String? = null,
+    @SerializedName("accessToken") val accessToken: String? = null,
+)
+
 data class TokenPair(
     @SerializedName("accessToken") val accessToken: String,
     @SerializedName("refreshToken") val refreshToken: String,

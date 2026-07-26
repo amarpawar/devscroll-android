@@ -1,9 +1,33 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
+    // On the classpath but not applied here: application is conditional on
+    // google-services.json existing, which the plugins block cannot express.
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
+}
+
+// App credentials live in local.properties (gitignored) rather than in tracked
+// resources. See local.properties.example for the required keys.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun secret(key: String): String = localProperties.getProperty(key) ?: ""
+
+// The Google Services plugin hard-fails when google-services.json is absent, which would
+// break the build for anyone who hasn't set up Firebase. Apply it only when the file is
+// there; CrashReporter degrades to a no-op at runtime when Firebase isn't initialised.
+if (file("google-services.json").exists()) {
+    pluginManager.apply(libs.plugins.google.services.get().pluginId)
+    pluginManager.apply(libs.plugins.firebase.crashlytics.get().pluginId)
+} else {
+    logger.lifecycle("google-services.json not found — Crashlytics disabled for this build.")
 }
 
 android {
@@ -18,11 +42,37 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        resValue("string", "google_web_client_id", secret("GOOGLE_WEB_CLIENT_ID"))
+        resValue("string", "facebook_app_id", secret("FACEBOOK_APP_ID"))
+        resValue("string", "facebook_client_token", secret("FACEBOOK_CLIENT_TOKEN"))
+        // Facebook's login redirect scheme is fb<app-id>.
+        resValue("string", "facebook_login_protocol_scheme", "fb${secret("FACEBOOK_APP_ID")}")
+    }
+
+    // Only configured when the keystore is actually present, so fresh clones and CI
+    // still build (unsigned) instead of failing at configuration time.
+    val releaseKeystore = secret("RELEASE_STORE_FILE")
+        .takeIf { it.isNotBlank() }
+        ?.let { rootProject.file(it) }
+        ?.takeIf { it.exists() }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = secret("RELEASE_STORE_PASSWORD")
+                keyAlias = secret("RELEASE_KEY_ALIAS")
+                keyPassword = secret("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -45,7 +95,7 @@ android {
     productFlavors {
         create("local") {
             dimension = "env"
-            buildConfigField("String", "API_BASE_URL", "\"http://192.168.1.5:8080/\"")
+            buildConfigField("String", "API_BASE_URL", "\"http://192.168.29.95:8080/\"")
         }
         create("dev") {
             dimension = "env"
@@ -102,6 +152,13 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+    implementation(libs.facebook.login)
+
+    // Crash reporting. Always on the classpath so CrashReporter compiles; actual
+    // collection depends on google-services.json being present (see above).
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.analytics)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

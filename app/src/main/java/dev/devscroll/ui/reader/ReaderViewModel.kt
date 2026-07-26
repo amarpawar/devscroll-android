@@ -39,10 +39,18 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     fun toggleSave(id: Long) {
         viewModelScope.launch {
-            repository.toggleSave(id)
+            repository.toggleSave(id).onFailure { e ->
+                _error.value = e.message ?: "Could not update bookmark"
+            }
+            // Re-read either way: on failure the repository has rolled the row back.
             _article.value = repository.getArticle(id)
         }
     }
+
+    fun clearError() { _error.value = null }
 }

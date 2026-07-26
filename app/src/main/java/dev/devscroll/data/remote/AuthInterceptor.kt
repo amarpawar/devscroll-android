@@ -1,8 +1,6 @@
 package dev.devscroll.data.remote
 
 import dev.devscroll.data.local.AuthPreferences
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
 import javax.inject.Inject
@@ -14,7 +12,9 @@ class AuthInterceptor @Inject constructor(
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val token = runBlocking { authPreferences.accessToken.first() }
+        // In-memory mirror; reading DataStore here blocked the OkHttp thread on disk
+        // for every request.
+        val token = authPreferences.cachedToken()
         val builder = chain.request().newBuilder()
         if (!token.isNullOrBlank()) {
             builder.addHeader("Authorization", "Bearer $token")

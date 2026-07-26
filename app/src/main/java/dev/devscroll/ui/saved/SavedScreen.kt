@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -121,6 +122,15 @@ fun SavedScreen(
                 onThemeToggle = { themeViewModel.toggleDark() },
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+            if (uiState.error != null) {
+                Text(
+                    text = "error: ${uiState.error}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+            }
 
             PullToRefreshBox(
                 isRefreshing = uiState.isRefreshing,

@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import dev.devscroll.data.model.Article
+import dev.devscroll.data.model.ArticleRules
 
 @Entity(
     tableName = "articles",
@@ -42,7 +43,7 @@ fun ArticleEntity.toDomain() = Article(
     thumbnailUrl = thumbnailUrl,
     title = title,
     url = url,
-    isHot = hitCount > 1,
+    isHot = hitCount > ArticleRules.HOT_HIT_THRESHOLD,
     isRead = isRead,
     isSaved = isSaved,
 )

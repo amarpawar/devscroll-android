@@ -75,6 +75,14 @@ fun ReaderScreen(
     var isWebViewLoading by remember(article?.url) { mutableStateOf(true) }
 
     var showAuthToast by remember { mutableStateOf(false) }
+    val saveError by viewModel.error.collectAsState()
+
+    LaunchedEffect(saveError) {
+        if (saveError != null) {
+            kotlinx.coroutines.delay(2500.milliseconds)
+            viewModel.clearError()
+        }
+    }
 
     LaunchedEffect(showAuthToast) {
         if (showAuthToast) {
@@ -158,6 +166,15 @@ fun ReaderScreen(
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
+        if (saveError != null) {
+            Text(
+                text = "error: $saveError",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+        }
+
         if (article == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 TerminalLoader(
@@ -178,7 +195,17 @@ fun ReaderScreen(
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
                                     request: WebResourceRequest,
-                                ) = false
+                                ): Boolean {
+                                    // Only web content stays in the WebView. Anything else
+                                    // (file://, intent://, custom schemes) is handed to the
+                                    // system so a hostile page cannot pivot to local files.
+                                    val scheme = request.url.scheme?.lowercase()
+                                    if (scheme == "http" || scheme == "https") return false
+                                    runCatching {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                                    }
+                                    return true
+                                }
 
                                 override fun onPageStarted(
                                     view: WebView?,
@@ -202,6 +229,14 @@ fun ReaderScreen(
                             }
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
+                            // JS is on, so local access must be off: below API 30 these
+                            // default to true, letting a page read app-private files.
+                            settings.allowFileAccess = false
+                            settings.allowContentAccess = false
+                            @Suppress("DEPRECATION")
+                            settings.allowFileAccessFromFileURLs = false
+                            @Suppress("DEPRECATION")
+                            settings.allowUniversalAccessFromFileURLs = false
                         }.also { webView = it }
                     },
                     update = { wv ->
@@ -210,6 +245,15 @@ fun ReaderScreen(
                             isWebViewLoading = true
                             wv.loadUrl(url)
                         }
+                    },
+                    onRelease = { wv ->
+                        // Without this each reader visit leaks a WebView and its
+                        // renderer process until GC.
+                        webView = null
+                        wv.stopLoading()
+                        wv.loadUrl("about:blank")
+                        wv.webViewClient = WebViewClient()
+                        wv.destroy()
                     },
                     modifier = Modifier.fillMaxSize(),
                 )

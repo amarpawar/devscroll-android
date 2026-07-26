@@ -46,6 +46,9 @@ private data class LoadState(
     val hasNext: Boolean = false,
     val error: String? = null,
     val searchQuery: String? = null,
+    // Lives here rather than in a plain field so uiState actually recomputes when
+    // the page changes — isBatchLimitReached is derived from it.
+    val page: Int = 0,
 )
 
 
@@ -74,7 +77,6 @@ class FeedViewModel @Inject constructor(
     private val blogFilter = MutableStateFlow<Long?>(null)
     private val sortOrder = MutableStateFlow(SortOrder.NEWEST)
     private val loadState = MutableStateFlow(LoadState())
-    private var currentPage = 0
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val articleSource = loadState
@@ -134,7 +136,7 @@ class FeedViewModel @Inject constructor(
         activeBlogState,
     ) { articles, filters, sort, load, blogState ->
         val isSearchActive = load.searchQuery != null
-        val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
+        val limitReached = (load.page + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
         FeedUiState(
             articles = articles,
             isRefreshing = load.isRefreshing,
@@ -167,8 +169,7 @@ class FeedViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            currentPage = 0
-            loadState.update { it.copy(isRefreshing = true, error = null) }
+            loadState.update { it.copy(isRefreshing = true, error = null, page = 0) }
             repository.clearFeedArticles()
             repository.fetchArticles(page = 0, sortType = sortOrder.value.name, blogId = blogFilter.value)
                 .onSuccess { page ->
@@ -182,8 +183,7 @@ class FeedViewModel @Inject constructor(
 
     fun search(query: String) {
         viewModelScope.launch {
-            currentPage = 0
-            loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = query) }
+            loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = query, page = 0) }
             repository.clearSearchResults()
             repository.search(query = query, page = 0)
                 .onSuccess { page ->
@@ -198,24 +198,23 @@ class FeedViewModel @Inject constructor(
     fun clearSearch() {
         viewModelScope.launch {
             repository.clearSearchResults()
-            currentPage = 0
-            loadState.update { it.copy(searchQuery = null, hasNext = false, error = null) }
+            loadState.update { it.copy(searchQuery = null, hasNext = false, error = null, page = 0) }
         }
     }
 
     fun loadNextPage() {
         val state = loadState.value
         if (state.isLoadingMore || state.isRefreshing || !state.hasNext) return
-        val limitReached = (currentPage + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
+        val limitReached = (state.page + 1) % PaginationConfig.MAX_PAGES_PER_BATCH == 0
         if (limitReached) return
 
+        val nextPage = state.page + 1
         viewModelScope.launch {
-            currentPage++
-            loadState.update { it.copy(isLoadingMore = true) }
+            loadState.update { it.copy(isLoadingMore = true, page = nextPage) }
             val result = if (state.searchQuery != null) {
-                repository.search(query = state.searchQuery, page = currentPage)
+                repository.search(query = state.searchQuery, page = nextPage)
             } else {
-                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name, blogId = blogFilter.value)
+                repository.fetchArticles(page = nextPage, sortType = sortOrder.value.name, blogId = blogFilter.value)
             }
             result
                 .onSuccess { page ->
@@ -225,8 +224,7 @@ class FeedViewModel @Inject constructor(
                     )}
                 }
                 .onFailure { e ->
-                    currentPage--
-                    loadState.update { it.copy(isLoadingMore = false, error = e.message) }
+                    loadState.update { it.copy(isLoadingMore = false, error = e.message, page = state.page) }
                 }
         }
     }
@@ -234,34 +232,32 @@ class FeedViewModel @Inject constructor(
     fun loadNextBatch() {
         val state = loadState.value
         if (state.isLoadingMore || state.isRefreshing || !state.hasNext) return
+        val nextPage = state.page + 1
         viewModelScope.launch {
-            currentPage++
-            loadState.update { it.copy(isRefreshing = true, error = null) }
+            loadState.update { it.copy(isRefreshing = true, error = null, page = nextPage) }
             if (state.searchQuery == null) {
                 repository.clearFeedArticles()
             } else {
                 repository.clearSearchResults()
             }
             val result = if (state.searchQuery != null) {
-                repository.search(query = state.searchQuery, page = currentPage)
+                repository.search(query = state.searchQuery, page = nextPage)
             } else {
-                repository.fetchArticles(page = currentPage, sortType = sortOrder.value.name, blogId = blogFilter.value)
+                repository.fetchArticles(page = nextPage, sortType = sortOrder.value.name, blogId = blogFilter.value)
             }
             result
                 .onSuccess { page ->
                     loadState.update { it.copy(isRefreshing = false, hasNext = page.hasNext) }
                 }
                 .onFailure { e ->
-                    currentPage--
-                    loadState.update { it.copy(isRefreshing = false, error = e.message) }
+                    loadState.update { it.copy(isRefreshing = false, error = e.message, page = state.page) }
                 }
         }
     }
 
     fun resetAndRefresh() {
         viewModelScope.launch {
-            currentPage = 0
-            loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = null) }
+            loadState.update { it.copy(isRefreshing = true, error = null, searchQuery = null, page = 0) }
             repository.clearFeedArticles()
             repository.clearSearchResults()
             repository.fetchArticles(page = 0, sortType = sortOrder.value.name, blogId = blogFilter.value)
@@ -274,7 +270,13 @@ class FeedViewModel @Inject constructor(
         }
     }
 
-    fun toggleSave(id: Long) { viewModelScope.launch { repository.toggleSave(id) } }
+    fun toggleSave(id: Long) {
+        viewModelScope.launch {
+            repository.toggleSave(id).onFailure { e ->
+                loadState.update { it.copy(error = e.message ?: "Could not update bookmark") }
+            }
+        }
+    }
     fun markRead(id: Long) { viewModelScope.launch { repository.markRead(id) } }
 
     fun setFilter(tags: Set<String>) { categoryFilters.value = tags }
