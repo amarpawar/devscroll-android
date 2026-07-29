@@ -21,9 +21,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val WAVE_DURATION_MS = 900
 
@@ -41,14 +43,14 @@ fun TerminalLoader(
 
     LaunchedEffect("label") {
         while (true) {
-            delay(WAVE_DURATION_MS.toLong())
+            delay(WAVE_DURATION_MS.toLong().milliseconds)
             labelIndex = (labelIndex + 1) % labels.size
         }
     }
 
     LaunchedEffect("hex") {
         while (true) {
-            delay(80L)
+            delay(80L.milliseconds)
             hexValue = randomHex()
         }
     }
@@ -67,6 +69,14 @@ fun TerminalLoader(
     val textMeasurer = rememberTextMeasurer()
     val charWidthPx = remember(style) {
         textMeasurer.measure("█", style).size.width.coerceAtLeast(1)
+    }
+    // Reserve the widest label's width up front. Without this the label wraps to a
+    // second line when a long one comes up, and the bar resizes on every 900ms swap.
+    val density = LocalDensity.current
+    val labelWidth = remember(labels, style, density) {
+        with(density) {
+            labels.maxOf { textMeasurer.measure(it, style).size.width }.toDp()
+        }
     }
     var numChars by remember { mutableIntStateOf(20) }
     val headPos = wavePos * (numChars + 4).toFloat()
@@ -99,9 +109,22 @@ fun TerminalLoader(
                 },
         )
         Spacer(modifier = Modifier.width(12.dp))
-        Text(text = labels[labelIndex], style = style, color = onSurface)
+        Text(
+            text = labels[labelIndex],
+            style = style,
+            color = onSurface,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(labelWidth),
+        )
         Spacer(modifier = Modifier.width(10.dp))
-        Text(text = hexValue, style = style, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = hexValue,
+            style = style,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
+        )
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = "■", style = style, color = primary)
     }

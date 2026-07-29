@@ -91,7 +91,7 @@ fun ProfileScreen(
             ) {
                 TerminalLoader(
                     labels = listOf("CONNECT /auth", "HANDSHAKE", "GET /profile"),
-                    modifier = Modifier.fillMaxWidth(0.6f)
+                    modifier = Modifier.fillMaxWidth(0.85f)
                 )
             }
         }
@@ -246,7 +246,7 @@ private fun LoggedInDashboard(
                     ) {
                         TerminalLoader(
                             labels = listOf("CONNECT /auth", "HANDSHAKE", "GET /profile"),
-                            modifier = Modifier.fillMaxWidth(0.6f)
+                            modifier = Modifier.fillMaxWidth(0.85f)
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -887,7 +887,7 @@ private fun LoggedOutView(
                 ) {
                     TerminalLoader(
                         labels = listOf("CONNECT /auth", "HANDSHAKE", "GET /profile"),
-                        modifier = Modifier.fillMaxWidth(0.6f)
+                        modifier = Modifier.fillMaxWidth(0.85f)
                     )
                 }
             } else {
