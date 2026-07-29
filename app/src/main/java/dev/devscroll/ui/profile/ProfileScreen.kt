@@ -2,7 +2,6 @@ package dev.devscroll.ui.profile
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,9 +70,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,28 +110,18 @@ fun ProfileScreen(
                 profileViewModel = profileViewModel,
             )
         }
-        is AuthUiState.LoggedOut -> {
-            LoggedOutView(
-                themeState = themeState,
-                profileViewModel = profileViewModel,
-                onThemeToggle = { themeViewModel.toggleDark() }
-            )
-        }
-        is AuthUiState.Authenticating -> {
-            LoggedOutView(
-                themeState = themeState,
-                profileViewModel = profileViewModel,
-                onThemeToggle = { themeViewModel.toggleDark() },
-                isLoading = true
-            )
-        }
-        is AuthUiState.Error -> {
+        // LoggedOut, Authenticating and Error deliberately share a single call site.
+        // Separate `when` branches are separate positions in the composition, so moving
+        // between them disposes LoggedOutView and discards its remembered form state —
+        // clearing the fields and snapping back to the sign-in tab on every error.
+        else -> {
             LoggedOutView(
                 themeState = themeState,
                 profileViewModel = profileViewModel,
                 onThemeToggle = { themeViewModel.toggleDark() },
-                errorMessage = state.message,
-                onClearError = { profileViewModel.clearError() }
+                isLoading = state is AuthUiState.Authenticating,
+                errorMessage = (state as? AuthUiState.Error)?.message,
+                onClearError = { profileViewModel.clearError() },
             )
         }
     }
@@ -166,7 +158,7 @@ private fun LoggedInDashboard(
 
     LaunchedEffect(exportMessage) {
         if (exportMessage != null) {
-            kotlinx.coroutines.delay(2500)
+            kotlinx.coroutines.delay(2500.milliseconds)
             profileViewModel.clearExportMessage()
         }
     }
@@ -201,7 +193,7 @@ private fun LoggedInDashboard(
                         showDeleteDialog = false
                         deletePassword = ""
                         profileViewModel.deleteAccount(request)
-                    } catch (e: GetCredentialCancellationException) {
+                    } catch (_: GetCredentialCancellationException) {
                         // Backed out of the sheet; leave the dialog open.
                     } catch (e: CancellationException) {
                         throw e
@@ -647,6 +639,123 @@ private fun ProfileActionRow(
     }
 }
 
+/**
+ * Collects an email and asks the backend to send a reset link. The reset itself happens
+ * on a web page from that email, so this dialog ends at the confirmation.
+ */
+@Composable
+private fun ForgotPasswordDialog(
+    initialEmail: String,
+    state: ForgotPasswordState,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var email by remember { mutableStateOf(initialEmail) }
+    val isSending = state is ForgotPasswordState.Sending
+    val isSent = state is ForgotPasswordState.Sent
+
+    Dialog(onDismissRequest = { if (!isSending) onDismiss() }) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+                .border(1.dp, MaterialTheme.colorScheme.outline)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "$ reset password",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+            )
+
+            if (isSent) {
+                // Deliberately vague: the API succeeds for unknown addresses too, so
+                // confirming delivery here would leak which emails are registered.
+                Text(
+                    text = "// if an account exists for that address, a reset link is on its way. " +
+                        "the link expires in 30 minutes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline)
+                        .clickable { onDismiss() }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "done",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+            } else {
+                Text(
+                    text = "// we'll email you a link to set a new password.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                TerminalInputField(
+                    label = "// email",
+                    value = email,
+                    onValueChange = { email = it },
+                    placeholder = "you@dev.local",
+                    keyboardType = KeyboardType.Email,
+                    enabled = !isSending,
+                )
+
+                if (state is ForgotPasswordState.Error) {
+                    Text(
+                        text = "[!] ${state.message}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .border(1.dp, MaterialTheme.colorScheme.outline)
+                            .clickable(enabled = !isSending) { onDismiss() }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "cancel",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable(enabled = !isSending) { onSubmit(email) }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = if (isSending) "sending..." else "$ send link",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** Maps the stored provider id onto what the user actually sees. */
 private fun String.providerLabel(): String = when (this) {
     "google" -> "google"
@@ -673,6 +782,21 @@ private fun LoggedOutView(
     var showConfirmPassword by remember { mutableStateOf(false) }
     val isSignUp = selectedTab == 1
 
+    var showForgotPassword by remember { mutableStateOf(false) }
+    val forgotPasswordState by profileViewModel.forgotPasswordState.collectAsState()
+    if (showForgotPassword) {
+        // Prefill with whatever they already typed into the sign-in form.
+        ForgotPasswordDialog(
+            initialEmail = email,
+            state = forgotPasswordState,
+            onSubmit = { profileViewModel.forgotPassword(it) },
+            onDismiss = {
+                showForgotPassword = false
+                profileViewModel.resetForgotPasswordState()
+            },
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(
             isDark = themeState.isDark,
@@ -683,6 +807,7 @@ private fun LoggedOutView(
         Column(
             modifier = Modifier
                 .weight(1f)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -769,7 +894,7 @@ private fun LoggedOutView(
                         coroutineScope.launch {
                             try {
                                 profileViewModel.loginWithGoogle(requestGoogleIdToken(context))
-                            } catch (e: GetCredentialCancellationException) {
+                            } catch (_: GetCredentialCancellationException) {
                                 // User dismissed the sheet; not an error worth showing.
                             } catch (e: CancellationException) {
                                 throw e
@@ -873,7 +998,12 @@ private fun LoggedOutView(
                     text = "forgot password?",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable { if (!isLoading) { } },
+                    modifier = Modifier.clickable {
+                        if (!isLoading) {
+                            profileViewModel.resetForgotPasswordState()
+                            showForgotPassword = true
+                        }
+                    },
                 )
             }
 

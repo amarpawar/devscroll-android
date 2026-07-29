@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,7 +47,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
+import androidx.compose.ui.platform.LocalContext
 import dev.devscroll.data.model.Article
+import dev.devscroll.navigation.shareArticle
 import kotlin.math.abs
 
 private val thumbnailSymbols = listOf("//", "#!", "~/", "\$_", "&&", "||", ">>", "{}", "[]", "=>", "::", "!!")
@@ -199,6 +202,7 @@ private fun StandardArticleCard(
             } else {
                 Spacer(Modifier.weight(1f))
             }
+            ShareButton(article)
             IconButton(
                 onClick = { if (!isSaving) onSaveClick(article) },
                 enabled = !isSaving,
@@ -219,6 +223,23 @@ private fun StandardArticleCard(
                 }
             }
         }
+    }
+}
+
+/** Shares the article link. Stateless, so both card variants drop it in identically. */
+@Composable
+private fun ShareButton(article: Article) {
+    val context = LocalContext.current
+    IconButton(
+        onClick = { context.shareArticle(article.title, article.url) },
+        modifier = Modifier.size(36.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Share,
+            contentDescription = "Share",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -340,6 +361,7 @@ private fun HotArticleCard(
             } else {
                 Spacer(Modifier.weight(1f))
             }
+            ShareButton(article)
             IconButton(
                 onClick = { if (!isSaving) onSaveClick(article) },
                 enabled = !isSaving,

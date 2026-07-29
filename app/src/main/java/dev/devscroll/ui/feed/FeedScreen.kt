@@ -35,6 +35,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -138,8 +139,19 @@ fun FeedScreen(
         }
     }
 
-    LaunchedEffect(uiState.sortOrder, uiState.activeCategoryFilters, uiState.searchQuery, uiState.activeBlogFilter) {
-        listState.scrollToItem(0)
+    // Reset to the top only when the filters genuinely changed. Keying a LaunchedEffect
+    // on them alone also fires on every entry into composition, which discarded the
+    // scroll position restored when returning from the reader. Saveable so the
+    // comparison survives navigating away and back.
+    val filterKey = "${uiState.sortOrder}|${uiState.activeCategoryFilters.sorted()}|" +
+            "${uiState.searchQuery}|${uiState.activeBlogFilter}"
+    var lastFilterKey by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(filterKey) {
+        if (lastFilterKey != null && lastFilterKey != filterKey) {
+            listState.scrollToItem(0)
+        }
+        lastFilterKey = filterKey
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

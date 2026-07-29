@@ -31,3 +31,21 @@ fun Context.openUrl(url: String) {
         Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show()
     }
 }
+
+/**
+ * Shares an article via the system sheet.
+ *
+ * Sends title and link as one text blob rather than using EXTRA_SUBJECT alone, since
+ * most targets (messaging apps, Slack) ignore the subject and would otherwise receive
+ * a bare URL with no context.
+ */
+fun Context.shareArticle(title: String, url: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, title)
+        putExtra(Intent.EXTRA_TEXT, "$title\n\n$url")
+    }
+    runCatching { startActivity(Intent.createChooser(intent, "Share article")) }.onFailure {
+        Toast.makeText(this, "Nothing available to share with", Toast.LENGTH_SHORT).show()
+    }
+}

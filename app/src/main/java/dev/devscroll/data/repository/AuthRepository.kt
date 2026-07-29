@@ -18,6 +18,9 @@ interface AuthRepository {
     
     suspend fun logout(): Result<Unit>
 
+    /** Requests a password-reset email. Succeeds even for unknown addresses. */
+    suspend fun forgotPassword(email: String): Result<Unit>
+
     suspend fun refreshProfile(): Result<User>
 
     /**

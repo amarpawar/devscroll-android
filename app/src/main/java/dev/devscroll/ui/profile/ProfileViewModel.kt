@@ -21,6 +21,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/** Kept separate from [AuthUiState] so requesting a reset doesn't disturb the sign-in form. */
+sealed interface ForgotPasswordState {
+    object Idle : ForgotPasswordState
+    object Sending : ForgotPasswordState
+    object Sent : ForgotPasswordState
+    data class Error(val message: String) : ForgotPasswordState
+}
+
 sealed interface AuthUiState {
     object LoggedOut : AuthUiState
     object Loading : AuthUiState
@@ -45,6 +53,9 @@ class ProfileViewModel @Inject constructor(
 
     private val _exportMessage = MutableStateFlow<String?>(null)
     val exportMessage: StateFlow<String?> = _exportMessage.asStateFlow()
+
+    private val _forgotPasswordState = MutableStateFlow<ForgotPasswordState>(ForgotPasswordState.Idle)
+    val forgotPasswordState: StateFlow<ForgotPasswordState> = _forgotPasswordState.asStateFlow()
 
     val uiState: StateFlow<AuthUiState> = combine(
         authRepository.userState,
@@ -134,6 +145,27 @@ class ProfileViewModel @Inject constructor(
             authRepository.refreshProfile()
             _isRefreshing.value = false
         }
+    }
+
+    fun forgotPassword(email: String) {
+        val trimmed = email.trim()
+        if (trimmed.isBlank()) {
+            _forgotPasswordState.value = ForgotPasswordState.Error("Enter your email address")
+            return
+        }
+        viewModelScope.launch {
+            _forgotPasswordState.value = ForgotPasswordState.Sending
+            authRepository.forgotPassword(trimmed)
+                .onSuccess { _forgotPasswordState.value = ForgotPasswordState.Sent }
+                .onFailure { error ->
+                    _forgotPasswordState.value =
+                        ForgotPasswordState.Error(error.message ?: "Could not send reset link")
+                }
+        }
+    }
+
+    fun resetForgotPasswordState() {
+        _forgotPasswordState.value = ForgotPasswordState.Idle
     }
 
     /** Surfaces failures raised by the credential UIs before a repository call happens. */

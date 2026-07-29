@@ -28,6 +28,10 @@ data class LogoutRequest(
     @SerializedName("refreshToken") val refreshToken: String
 )
 
+data class ForgotPasswordRequest(
+    @SerializedName("email") val email: String
+)
+
 /**
  * Carries a freshly obtained credential so the server can verify the user really is
  * present before an irreversible delete. Exactly one field is populated, chosen by the

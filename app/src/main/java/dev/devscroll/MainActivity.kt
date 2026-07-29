@@ -216,14 +216,19 @@ class MainActivity : ComponentActivity() {
                             val filterTagsList by backStackEntry.savedStateHandle
                                 .getStateFlow<ArrayList<String>>("filter_tags", arrayListOf())
                                 .collectAsState()
-                            LaunchedEffect(filterTagsList) {
-                                feedViewModel.setFilter(filterTagsList.toSet())
+                            val filterTags = filterTagsList.toSet()
+                            LaunchedEffect(filterTags) {
+                                if (feedViewModel.uiState.value.activeCategoryFilters != filterTags) {
+                                    feedViewModel.setFilter(filterTags)
+                                }
                             }
                             val filterBlogId by backStackEntry.savedStateHandle
                                 .getStateFlow<Long?>("filter_blog_id", null)
                                 .collectAsState()
                             LaunchedEffect(filterBlogId) {
-                                feedViewModel.setBlogFilter(filterBlogId)
+                                if (feedViewModel.uiState.value.activeBlogFilter != filterBlogId) {
+                                    feedViewModel.setBlogFilter(filterBlogId)
+                                }
                             }
                             FeedScreen(
                                 viewModel = feedViewModel,

@@ -58,6 +58,13 @@ interface DevscrollApiService {
     @POST("devscroll/api/auth/facebook")
     suspend fun loginWithFacebook(@Body request: FacebookSignInRequest): TokenPair
 
+    /**
+     * Always succeeds regardless of whether the account exists — the backend
+     * deliberately avoids revealing which emails are registered.
+     */
+    @POST("devscroll/api/auth/forgot-password")
+    suspend fun forgotPassword(@Body request: ForgotPasswordRequest): Response<Unit>
+
     @POST("devscroll/api/auth/refresh")
     suspend fun refreshSession(@Body request: RefreshRequest): TokenPair
 
