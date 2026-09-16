@@ -20,7 +20,10 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +61,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material.icons.outlined.Flag
+import dev.devscroll.navigation.reportArticle
 import dev.devscroll.navigation.shareArticle
 import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalToast
@@ -77,6 +82,7 @@ fun ReaderScreen(
     var isWebViewLoading by remember(article?.url) { mutableStateOf(true) }
 
     var showAuthToast by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
     val saveError by viewModel.error.collectAsState()
 
     LaunchedEffect(saveError) {
@@ -125,63 +131,115 @@ fun ReaderScreen(
                         .weight(1f)
                         .padding(horizontal = 4.dp),
                 )
-                IconButton(
-                    onClick = {
-                        if (user == null) {
-                            showAuthToast = true
-                        } else {
-                            article?.let { viewModel.toggleSave(it.id) }
-                        }
-                    },
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = if (article?.isSaved == true) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (article?.isSaved == true) "Unsave" else "Save",
-                        tint = if (article?.isSaved == true)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        article?.let { context.shareArticle(it.title, it.url) }
-                    },
-                    modifier = Modifier.size(40.dp),
-                    enabled = article != null,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Share,
-                        contentDescription = "Share",
-                        tint = if (article != null)
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            IconButton(
-                onClick = {
-                    article?.url?.let { url ->
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                        context.startActivity(intent)
+                // All actions live behind one overflow so the title keeps its width.
+                Box {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.size(40.dp),
+                        enabled = article != null,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More options",
+                            tint = if (article != null)
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
-                },
-                modifier = Modifier.size(40.dp),
-                enabled = article?.url != null
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = "Open in browser",
-                    tint = if (article?.url != null)
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = if (article?.isSaved == true) "unsave" else "save",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (article?.isSaved == true) Icons.Filled.Bookmark
+                                    else Icons.Outlined.BookmarkBorder,
+                                    contentDescription = null,
+                                    tint = if (article?.isSaved == true)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                if (user == null) {
+                                    showAuthToast = true
+                                } else {
+                                    article?.let { viewModel.toggleSave(it.id) }
+                                }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("share", style = MaterialTheme.typography.bodyMedium) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Filled.Share,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                article?.let { context.shareArticle(it.title, it.url) }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("open in browser", style = MaterialTheme.typography.bodyMedium) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                article?.url?.let { url ->
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                }
+                            },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        // Separated: destructive-ish and rarely wanted by accident.
+                        DropdownMenuItem(
+                            text = { Text("report", style = MaterialTheme.typography.bodyMedium) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.Flag,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                article?.let {
+                                    context.reportArticle(
+                                        articleId = it.id,
+                                        title = it.title,
+                                        url = it.url,
+                                        source = it.blogName,
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 

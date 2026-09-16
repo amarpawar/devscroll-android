@@ -6,6 +6,9 @@ object Screen {
     const val SOURCES = "sources"
     const val PROFILE = "profile"
     const val SEARCH = "search"
+
+    /** Deliberately absent from [bottomNavRoutes] — not a tab, so no bottom bar or swipe gesture. */
+    const val CONTACT = "contact"
     const val READER = "reader/{articleId}"
     const val READER_ARG = "articleId"
 

@@ -9,19 +9,22 @@ import androidx.core.net.toUri
 /**
  * Hosted pages the app links out to.
  *
- * Served by the backend's LegalController under the `/devscroll/api` context path, and
- * whitelisted in SecurityConfig so they load unauthenticated — which is what Play review
- * requires.
+ * Served publicly from the marketing site, so they load unauthenticated — which is what
+ * Play review requires.
  *
  * Pinned to production rather than derived from [dev.devscroll.BuildConfig.API_BASE_URL]:
  * the documents are identical in every environment, and a `local` build would otherwise
  * point a tester at an unreachable LAN address.
  */
 object ExternalLinks {
-    private const val LEGAL_BASE = "https://api.devscroll.in/devscroll/api/legal"
+    private const val LEGAL_BASE = "https://devscroll.in"
 
     const val PRIVACY = "$LEGAL_BASE/privacy"
     const val TERMS = "$LEGAL_BASE/terms"
+    const val CONTACT = "$LEGAL_BASE/contact"
+
+    /** Must stay identical to the address in the website, both legal docs, and the Play listing. */
+    const val SUPPORT_EMAIL = "support@devscroll.in"
 }
 
 /** Opens [url] in the user's browser, matching the reader's "open in browser" behaviour. */
@@ -30,6 +33,45 @@ fun Context.openUrl(url: String) {
     runCatching { startActivity(intent) }.onFailure {
         Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show()
     }
+}
+
+/**
+ * Opens a mail composer addressed to [address].
+ *
+ * Uses ACTION_SENDTO with a mailto: URI rather than ACTION_SEND, so the chooser offers
+ * mail clients only instead of every app that accepts text.
+ */
+fun Context.sendEmail(address: String, subject: String = "", body: String = "") {
+    val intent = Intent(Intent.ACTION_SENDTO).apply {
+        data = "mailto:$address".toUri()
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, body)
+    }
+    runCatching { startActivity(intent) }.onFailure {
+        // The address is always visible on screen, so the user can still copy it.
+        Toast.makeText(this, "No email app found — copy the address instead", Toast.LENGTH_LONG).show()
+    }
+}
+
+/**
+ * Reports an article to support, prefilled so the message arrives actionable.
+ *
+ * This is the app's content-report path for aggregated third-party articles, and it's
+ * what the website's contact page points users to.
+ */
+fun Context.reportArticle(articleId: Long, title: String, url: String, source: String) {
+    sendEmail(
+        address = ExternalLinks.SUPPORT_EMAIL,
+        subject = "Report: $title",
+        body = buildString {
+            appendLine("Article ID: $articleId")
+            appendLine("URL: $url")
+            appendLine("Source: $source")
+            appendLine()
+            appendLine("Please describe the problem:")
+            appendLine()
+        },
+    )
 }
 
 /**

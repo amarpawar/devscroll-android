@@ -79,6 +79,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    onContactClick: () -> Unit = {},
     themeViewModel: ThemeViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -108,6 +109,7 @@ fun ProfileScreen(
                 onLogout = { profileViewModel.logout() },
                 themeViewModel = themeViewModel,
                 profileViewModel = profileViewModel,
+                onContactClick = onContactClick,
             )
         }
         // LoggedOut, Authenticating and Error deliberately share a single call site.
@@ -122,6 +124,7 @@ fun ProfileScreen(
                 isLoading = state is AuthUiState.Authenticating,
                 errorMessage = (state as? AuthUiState.Error)?.message,
                 onClearError = { profileViewModel.clearError() },
+                onContactClick = onContactClick,
             )
         }
     }
@@ -136,6 +139,7 @@ private fun LoggedInDashboard(
     onLogout: () -> Unit,
     themeViewModel: ThemeViewModel,
     profileViewModel: ProfileViewModel,
+    onContactClick: () -> Unit,
 ) {
     val themeState by themeViewModel.themeState.collectAsState()
     val isDark = themeState.isDark
@@ -579,6 +583,15 @@ private fun LoggedInDashboard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                // First in the section: Play's News policy requires contact details to be
+                // easy to find in-app, and the address shows on the row itself.
+                ProfileActionRow(
+                    title = "contact us",
+                    subtitle = ExternalLinks.SUPPORT_EMAIL,
+                    onClick = onContactClick
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
                 ProfileActionRow(
                     title = "terms of service",
                     subtitle = "read our privacy policies and terms of usage",
@@ -769,7 +782,8 @@ private fun LoggedOutView(
     onThemeToggle: () -> Unit,
     errorMessage: String? = null,
     onClearError: (() -> Unit)? = null,
-    isLoading: Boolean = false
+    isLoading: Boolean = false,
+    onContactClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -1076,6 +1090,14 @@ private fun LoggedOutView(
                     text = "// no email marketing. ever.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // Also reachable signed out — the about section lives in the dashboard,
+                // which a reviewer who never creates an account would never see.
+                Text(
+                    text = "// contact us",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable { onContactClick() },
                 )
             }
         }

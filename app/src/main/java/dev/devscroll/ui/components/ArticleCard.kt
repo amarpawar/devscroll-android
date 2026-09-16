@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +34,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -49,6 +51,7 @@ import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import androidx.compose.ui.platform.LocalContext
 import dev.devscroll.data.model.Article
+import dev.devscroll.navigation.reportArticle
 import dev.devscroll.navigation.shareArticle
 import kotlin.math.abs
 
@@ -113,32 +116,42 @@ private fun StandardArticleCard(
     ) {
         // Metadata row
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            SourceBadge(blogName = article.blogName, size = 18.dp)
-            Text(
-                text = "#${article.authors.firstOrNull() ?: article.blogName}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-            Text(
-                text = timeAgo(article.publishedOn),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (article.isHot) {
+            // Nested row owns the weight so the author's own weight is measured against
+            // this row alone. Two weighted siblings would split the free space between
+            // them and truncate the author name at half its available width.
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                SourceBadge(blogName = article.blogName, size = 18.dp)
                 Text(
-                    text = "[HOT]",
+                    text = "#${article.authors.firstOrNull() ?: article.blogName}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                Text(
+                    text = timeAgo(article.publishedOn),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (article.isHot) {
+                    Text(
+                        text = "[HOT]",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
+            ReportButton(article)
         }
 
         Spacer(Modifier.height(8.dp))
@@ -226,6 +239,33 @@ private fun StandardArticleCard(
     }
 }
 
+/**
+ * Report action, sized to sit in the metadata row without adding height to it —
+ * the row is only as tall as its labelSmall text plus the 18dp source badge.
+ */
+@Composable
+private fun ReportButton(article: Article) {
+    val context = LocalContext.current
+    IconButton(
+        onClick = {
+            context.reportArticle(
+                articleId = article.id,
+                title = article.title,
+                url = article.url,
+                source = article.blogName,
+            )
+        },
+        modifier = Modifier.size(22.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Flag,
+            contentDescription = "Report this article",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.size(14.dp),
+        )
+    }
+}
+
 /** Shares the article link. Stateless, so both card variants drop it in identically. */
 @Composable
 private fun ShareButton(article: Article) {
@@ -251,6 +291,7 @@ private fun TerminalThumbnail(seed: Any) {
     Box(
         modifier = Modifier
             .size(72.dp)
+            .clipToBounds()
             .drawWithCache {
                 val stripes = buildStripePath(size, spacing = 10.dp.toPx())
                 val strokeWidth = 1.dp.toPx()
@@ -305,28 +346,36 @@ private fun HotArticleCard(
         Spacer(Modifier.height(12.dp))
         
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            SourceBadge(blogName = article.blogName, size = 18.dp)
-            Text(
-                text = "#${article.authors.firstOrNull() ?: article.blogName}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-            Text(
-                text = timeAgo(article.publishedOn),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Same nesting as the standard card — see the note there.
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                SourceBadge(blogName = article.blogName, size = 18.dp)
+                Text(
+                    text = "#${article.authors.firstOrNull() ?: article.blogName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                Text(
+                    text = timeAgo(article.publishedOn),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            ReportButton(article)
         }
 
         Spacer(Modifier.height(8.dp))
-        
+
         Text(
             text = article.title,
             style = MaterialTheme.typography.titleMedium,
@@ -422,6 +471,7 @@ private fun HotTerminalThumbnail(seed: Any) {
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .clipToBounds()
             .drawWithCache {
                 val stripes = buildStripePath(size, spacing = 12.dp.toPx())
                 val strokeWidth = 1.5.dp.toPx()

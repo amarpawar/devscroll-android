@@ -36,6 +36,7 @@ import dev.devscroll.data.model.User
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.feed.FeedScreen
 import dev.devscroll.ui.feed.FeedViewModel
+import dev.devscroll.ui.contact.ContactScreen
 import dev.devscroll.ui.profile.ProfileScreen
 import dev.devscroll.ui.reader.ReaderScreen
 import dev.devscroll.ui.saved.SavedScreen
@@ -278,7 +279,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.PROFILE) {
-                            ProfileScreen()
+                            ProfileScreen(
+                                onContactClick = { navController.navigate(Screen.CONTACT) },
+                            )
+                        }
+                        composable(Screen.CONTACT) {
+                            ContactScreen()
                         }
                         composable(Screen.SEARCH) {
                             val feedEntry = remember(navController.currentBackStackEntry) { navController.getBackStackEntry(Screen.FEED) }
