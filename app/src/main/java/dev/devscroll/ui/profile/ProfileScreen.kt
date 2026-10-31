@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
@@ -48,7 +47,6 @@ import dev.devscroll.data.remote.dto.DeleteAccountRequest
 import dev.devscroll.navigation.ExternalLinks
 import dev.devscroll.navigation.openUrl
 import dev.devscroll.ui.components.TerminalConfirmDialog
-import dev.devscroll.ui.components.TopBar
 import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.theme.ThemeViewModel
 import dev.devscroll.ui.theme.AccentColor
@@ -75,6 +73,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+import dev.devscroll.ui.components.TerminalDivider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +82,6 @@ fun ProfileScreen(
     themeViewModel: ThemeViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel(),
 ) {
-    val themeState by themeViewModel.themeState.collectAsState()
     val authState by profileViewModel.uiState.collectAsState()
 
     when (val state = authState) {
@@ -118,9 +116,7 @@ fun ProfileScreen(
         // clearing the fields and snapping back to the sign-in tab on every error.
         else -> {
             LoggedOutView(
-                themeState = themeState,
                 profileViewModel = profileViewModel,
-                onThemeToggle = { themeViewModel.toggleDark() },
                 isLoading = state is AuthUiState.Authenticating,
                 errorMessage = (state as? AuthUiState.Error)?.message,
                 onClearError = { profileViewModel.clearError() },
@@ -214,12 +210,6 @@ private fun LoggedInDashboard(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(
-            isDark = isDark,
-            onThemeToggle = { themeViewModel.toggleDark() },
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
@@ -245,7 +235,7 @@ private fun LoggedInDashboard(
                             modifier = Modifier.fillMaxWidth(0.85f)
                         )
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    TerminalDivider()
                 }
             // Header Row: < $ whoami
             Row(
@@ -518,7 +508,7 @@ private fun LoggedInDashboard(
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
 
             // Account Section
             Column(
@@ -538,7 +528,7 @@ private fun LoggedInDashboard(
                     subtitle = "${user.provider.providerLabel()} · linked",
                     onClick = null,
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
 
                 ProfileActionRow(
                     title = "export data",
@@ -551,14 +541,14 @@ private fun LoggedInDashboard(
                         if (!isExporting) exportLauncher.launch("devscroll-export.json")
                     }
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
 
                 ProfileActionRow(
                     title = "logout",
                     subtitle = "disconnect active session",
                     onClick = onLogout
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
 
                 ProfileActionRow(
                     title = "delete account",
@@ -568,7 +558,7 @@ private fun LoggedInDashboard(
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
 
             // About Section
             Column(
@@ -590,14 +580,14 @@ private fun LoggedInDashboard(
                     subtitle = ExternalLinks.SUPPORT_EMAIL,
                     onClick = onContactClick
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
 
                 ProfileActionRow(
                     title = "terms of service",
                     subtitle = "read our privacy policies and terms of usage",
                     onClick = { context.openUrl(ExternalLinks.TERMS) }
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
 
                 ProfileActionRow(
                     title = "privacy policy",
@@ -777,9 +767,7 @@ private fun String.providerLabel(): String = when (this) {
 
 @Composable
 private fun LoggedOutView(
-    themeState: dev.devscroll.ui.theme.ThemeState,
     profileViewModel: ProfileViewModel,
-    onThemeToggle: () -> Unit,
     errorMessage: String? = null,
     onClearError: (() -> Unit)? = null,
     isLoading: Boolean = false,
@@ -812,12 +800,6 @@ private fun LoggedOutView(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(
-            isDark = themeState.isDark,
-            onThemeToggle = onThemeToggle,
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -922,13 +904,13 @@ private fun LoggedOutView(
 
             // Or divider
             Row(verticalAlignment = Alignment.CenterVertically) {
-                HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
+                TerminalDivider(modifier = Modifier.weight(1f))
                 Text(
                     text = "  // or  ",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
+                TerminalDivider(modifier = Modifier.weight(1f))
             }
 
             // Sign in / Sign up tab row

@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -48,10 +47,9 @@ import dev.devscroll.ui.components.BlinkingEmptyState
 import dev.devscroll.ui.components.TerminalLoadMore
 import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalToast
-import dev.devscroll.ui.components.TopBar
-import dev.devscroll.ui.theme.ThemeViewModel
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+import dev.devscroll.ui.components.TerminalDivider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,12 +58,10 @@ fun SavedScreen(
     onSignInClick: () -> Unit = {},
     tabClickTrigger: Long = 0L,
     viewModel: SavedViewModel = hiltViewModel(),
-    themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val savingArticles by viewModel.savingArticles.collectAsState()
     val articles = uiState.articles
-    val themeState by themeViewModel.themeState.collectAsState()
     val user by viewModel.userState.collectAsState()
 
     var showAuthToast by remember { mutableStateOf(false) }
@@ -117,12 +113,6 @@ fun SavedScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopBar(
-                isDark = themeState.isDark,
-                onThemeToggle = { themeViewModel.toggleDark() },
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
             if (uiState.error != null) {
                 Text(
                     text = "error: ${uiState.error}",
@@ -162,7 +152,7 @@ fun SavedScreen(
                                 onSaveClick = onSaveClicked,
                                 isSaving = article.id in savingArticles,
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                            TerminalDivider()
                         }
 
                         if (uiState.isLoadingMore) {

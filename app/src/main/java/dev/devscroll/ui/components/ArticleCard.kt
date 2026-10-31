@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,6 +73,11 @@ private fun buildStripePath(size: Size, spacing: Float): Path = Path().apply {
     }
 }
 
+/**
+ * One article row. [style] only changes how the title, description and thumbnail are laid out;
+ * the meta row (author, age, report) and footer (tags, share, save) are the same in every style.
+ * When null (Saved, Search), hot articles get the big preview and the rest the small thumbnail.
+ */
 @Composable
 fun ArticleCard(
     article: Article,
@@ -79,34 +85,9 @@ fun ArticleCard(
     onSaveClick: (Article) -> Unit,
     isSaving: Boolean = false,
     modifier: Modifier = Modifier,
+    style: FeedStyle? = null,
 ) {
-    if (article.isHot) {
-        HotArticleCard(
-            article = article,
-            onArticleClick = onArticleClick,
-            onSaveClick = onSaveClick,
-            isSaving = isSaving,
-            modifier = modifier,
-        )
-    } else {
-        StandardArticleCard(
-            article = article,
-            onArticleClick = onArticleClick,
-            onSaveClick = onSaveClick,
-            isSaving = isSaving,
-            modifier = modifier,
-        )
-    }
-}
-
-@Composable
-private fun StandardArticleCard(
-    article: Article,
-    onArticleClick: (Article) -> Unit,
-    onSaveClick: (Article) -> Unit,
-    isSaving: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
+    val resolved = style ?: if (article.isHot) FeedStyle.BIG_THUMBNAILS else FeedStyle.SMALL_THUMBNAILS
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -114,126 +95,170 @@ private fun StandardArticleCard(
             .alpha(if (article.isRead) 0.6f else 1f)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        // Metadata row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Nested row owns the weight so the author's own weight is measured against
-            // this row alone. Two weighted siblings would split the free space between
-            // them and truncate the author name at half its available width.
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                SourceBadge(blogName = article.blogName, size = 18.dp)
-                Text(
-                    text = "#${article.authors.firstOrNull() ?: article.blogName}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-                Text(
-                    text = timeAgo(article.publishedOn),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (article.isHot) {
-                    Text(
-                        text = "[HOT]",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
+        if (resolved == FeedStyle.BIG_THUMBNAILS) {
+            HotThumbnail(article = article)
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // The big preview carries its own HOT badge, so the inline tag would be redundant there.
+        MetaRow(article, showHotTag = resolved != FeedStyle.BIG_THUMBNAILS)
+
+        Spacer(Modifier.height(8.dp))
+
+        when (resolved) {
+            FeedStyle.BIG_THUMBNAILS -> {
+                ArticleTitle(article, MaterialTheme.typography.titleMedium, maxLines = 3)
+                ArticleDescription(article, maxLines = 2)
+            }
+            FeedStyle.SMALL_THUMBNAILS -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .align(Alignment.Top),
+                    ) {
+                        ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 3)
+                        ArticleDescription(article, maxLines = 3)
+                    }
+                    SmallThumbnail(article)
                 }
             }
-            ReportButton(article)
+            FeedStyle.TEXT_ONLY -> {
+                ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 3)
+                ArticleDescription(article, maxLines = 3)
+            }
+            FeedStyle.COMPACT_LIST -> {
+                ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 2)
+            }
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // Title + thumbnail
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .align(Alignment.Top),
-            ) {
+        FooterRow(article, onSaveClick, isSaving)
+    }
+}
+
+/** Source badge, author, age and optional [HOT] tag, with the report button on the right. */
+@Composable
+private fun MetaRow(article: Article, showHotTag: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Nested row owns the weight so the author's own weight is measured against
+        // this row alone. Two weighted siblings would split the free space between
+        // them and truncate the author name at half its available width.
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            SourceBadge(blogName = article.blogName, size = 18.dp)
+            Text(
+                text = "#${article.authors.firstOrNull() ?: article.blogName}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = timeAgo(article.publishedOn),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (showHotTag && article.isHot) {
                 Text(
-                    text = article.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
+                    text = "[HOT]",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
                 )
-                if (article.description.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = article.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
-            if (article.thumbnailUrl != null) {
-                SubcomposeAsyncImage(
-                    model = article.thumbnailUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(72.dp),
-                    loading = {
-                        TerminalThumbnail(seed = article.id)
-                    },
-                    error = {
-                        TerminalThumbnail(seed = article.id)
-                    }
-                )
-            } else {
+        }
+        ReportButton(article)
+    }
+}
+
+@Composable
+private fun ArticleTitle(article: Article, style: TextStyle, maxLines: Int) {
+    Text(
+        text = article.title,
+        style = style,
+        color = MaterialTheme.colorScheme.onBackground,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun ArticleDescription(article: Article, maxLines: Int) {
+    if (article.description.isBlank()) return
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = article.description,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun SmallThumbnail(article: Article) {
+    if (article.thumbnailUrl != null) {
+        SubcomposeAsyncImage(
+            model = article.thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(72.dp),
+            loading = {
+                TerminalThumbnail(seed = article.id)
+            },
+            error = {
                 TerminalThumbnail(seed = article.id)
             }
+        )
+    } else {
+        TerminalThumbnail(seed = article.id)
+    }
+}
+
+/** Categories on the left; share and save on the right. */
+@Composable
+private fun FooterRow(article: Article, onSaveClick: (Article) -> Unit, isSaving: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (article.categories.isNotEmpty()) {
+            Text(
+                text = article.categories.joinToString(", ") { "#$it" },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Categories + bookmark
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (article.categories.isNotEmpty()) {
-                Text(
-                    text = article.categories.joinToString(", ") { "#$it" },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+        ShareButton(article)
+        IconButton(
+            onClick = { if (!isSaving) onSaveClick(article) },
+            enabled = !isSaving,
+            modifier = Modifier.size(36.dp)
+        ) {
+            if (isSaving) {
+                TerminalSpinner(modifier = Modifier.size(18.dp))
             } else {
-                Spacer(Modifier.weight(1f))
-            }
-            ShareButton(article)
-            IconButton(
-                onClick = { if (!isSaving) onSaveClick(article) },
-                enabled = !isSaving,
-                modifier = Modifier.size(36.dp)
-            ) {
-                if (isSaving) {
-                    TerminalSpinner(modifier = Modifier.size(18.dp))
-                } else {
-                    Icon(
-                        imageVector = if (article.isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (article.isSaved) "Unsave" else "Save",
-                        tint = if (article.isSaved)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                Icon(
+                    imageVector = if (article.isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                    contentDescription = if (article.isSaved) "Unsave" else "Save",
+                    tint = if (article.isSaved)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }
@@ -246,41 +271,27 @@ private fun StandardArticleCard(
 @Composable
 private fun ReportButton(article: Article) {
     val context = LocalContext.current
-    IconButton(
-        onClick = {
+    TerminalIconButton(
+        icon = Icons.Outlined.Flag,
+        contentDescription = "Report this article",
+        buttonSize = 22.dp,
+        iconSize = 14.dp,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+    ) {
             context.reportArticle(
                 articleId = article.id,
                 title = article.title,
                 url = article.url,
                 source = article.blogName,
             )
-        },
-        modifier = Modifier.size(22.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Flag,
-            contentDescription = "Report this article",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.size(14.dp),
-        )
-    }
+        }
 }
 
 /** Shares the article link. Stateless, so both card variants drop it in identically. */
 @Composable
 private fun ShareButton(article: Article) {
     val context = LocalContext.current
-    IconButton(
-        onClick = { context.shareArticle(article.title, article.url) },
-        modifier = Modifier.size(36.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Filled.Share,
-            contentDescription = "Share",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-    }
+    TerminalIconButton(Icons.Filled.Share, "Share", buttonSize = 36.dp, iconSize = 18.dp) { context.shareArticle(article.title, article.url) }
 }
 
 @Composable
@@ -327,114 +338,6 @@ private fun timeAgo(epochMillis: Long): String {
 }
 
 @Composable
-private fun HotArticleCard(
-    article: Article,
-    onArticleClick: (Article) -> Unit,
-    onSaveClick: (Article) -> Unit,
-    isSaving: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onArticleClick(article) }
-            .alpha(if (article.isRead) 0.6f else 1f)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        HotThumbnail(article = article)
-        
-        Spacer(Modifier.height(12.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Same nesting as the standard card — see the note there.
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                SourceBadge(blogName = article.blogName, size = 18.dp)
-                Text(
-                    text = "#${article.authors.firstOrNull() ?: article.blogName}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-                Text(
-                    text = timeAgo(article.publishedOn),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            ReportButton(article)
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = article.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        
-        if (article.description.isNotBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = article.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        
-        Spacer(Modifier.height(8.dp))
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (article.categories.isNotEmpty()) {
-                Text(
-                    text = article.categories.joinToString(", ") { "#$it" },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
-            ShareButton(article)
-            IconButton(
-                onClick = { if (!isSaving) onSaveClick(article) },
-                enabled = !isSaving,
-                modifier = Modifier.size(36.dp)
-            ) {
-                if (isSaving) {
-                    TerminalSpinner(modifier = Modifier.size(18.dp))
-                } else {
-                    Icon(
-                        imageVector = if (article.isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (article.isSaved) "Unsave" else "Save",
-                        tint = if (article.isSaved)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun HotThumbnail(article: Article) {
     Box(
         modifier = Modifier
@@ -458,7 +361,7 @@ private fun HotThumbnail(article: Article) {
         } else {
             HotTerminalThumbnail(seed = article.id)
         }
-        
+
         HotThumbnailOverlay(article = article)
     }
 }
@@ -508,22 +411,26 @@ private fun HotThumbnailOverlay(article: Article) {
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.align(Alignment.TopStart)
         )
-        
-        val shape = RoundedCornerShape(2.dp)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .border(1.dp, MaterialTheme.colorScheme.primary, shape)
-                .padding(horizontal = 8.dp, vertical = 3.dp)
-        ) {
-            Text(
-                text = "🔥 HOT",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+
+        // The big layout is used for every article when picked from the feed menu,
+        // so the badge only shows for articles that are actually hot.
+        if (article.isHot) {
+            val shape = RoundedCornerShape(2.dp)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .border(1.dp, MaterialTheme.colorScheme.primary, shape)
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = "🔥 HOT",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
-        
+
         val hexString = "0x" + article.id.toString(16).lowercase()
         Text(
             text = hexString,

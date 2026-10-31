@@ -15,4 +15,7 @@ object Screen {
     fun reader(articleId: Long) = "reader/$articleId"
 
     val bottomNavRoutes = setOf(FEED, SAVED, SOURCES, PROFILE)
+
+    /** Routes whose top bar is drawn once by the Scaffold, so it stays fixed while content slides. */
+    val topBarRoutes = bottomNavRoutes + CONTACT
 }

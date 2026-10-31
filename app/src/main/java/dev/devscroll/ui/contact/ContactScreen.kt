@@ -15,13 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -33,8 +31,7 @@ import android.widget.Toast
 import dev.devscroll.navigation.ExternalLinks
 import dev.devscroll.navigation.openUrl
 import dev.devscroll.navigation.sendEmail
-import dev.devscroll.ui.components.TopBar
-import dev.devscroll.ui.theme.ThemeViewModel
+import dev.devscroll.ui.components.TerminalDivider
 
 /**
  * In-app contact details.
@@ -44,20 +41,11 @@ import dev.devscroll.ui.theme.ThemeViewModel
  * rather than hidden behind a link-out or a mail intent that may have no handler.
  */
 @Composable
-fun ContactScreen(
-    themeViewModel: ThemeViewModel = hiltViewModel(),
-) {
+fun ContactScreen() {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    val themeState by themeViewModel.themeState.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(
-            isDark = themeState.isDark,
-            onThemeToggle = { themeViewModel.toggleDark() },
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -150,7 +138,7 @@ fun ContactScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
 
             Text(
                 text = "// to report a problem with an article, open it and tap the report icon.",

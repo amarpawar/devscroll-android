@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -22,9 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -62,31 +60,43 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.components.ArticleCard
+import dev.devscroll.ui.components.FeedStyle
 import dev.devscroll.ui.components.BlinkingEmptyState
 import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalLoadMore
-import dev.devscroll.ui.components.TopBar
 import dev.devscroll.ui.components.TerminalToast
-import dev.devscroll.ui.theme.ThemeViewModel
 import dev.devscroll.ui.PaginationConfig
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+import dev.devscroll.ui.components.TerminalDivider
+import dev.devscroll.ui.components.TerminalIconButton
+import dev.devscroll.ui.components.TopBarActions
+import dev.devscroll.icons.computer
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(
     onArticleClick: (Long) -> Unit,
-    onSearchClick: () -> Unit,
     onClearFilter: () -> Unit = {},
     onClearBlogFilter: () -> Unit = {},
     onSignInClick: () -> Unit = {},
     tabClickTrigger: Long = 0L,
+    onSearchClick: () -> Unit = {},
     viewModel: FeedViewModel = hiltViewModel(),
-    themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
+    val feedStyle by viewModel.feedStyle.collectAsState()
+    TopBarActions {
+        FeedStyleMenu(selected = feedStyle, onSelect = viewModel::setFeedStyle)
+        TerminalIconButton(Icons.Default.Search, "Search", onClick = onSearchClick)
+    }
+
     val uiState by viewModel.uiState.collectAsState()
     val savingArticles by viewModel.savingArticles.collectAsState()
-    val themeState by themeViewModel.themeState.collectAsState()
     val user by viewModel.userState.collectAsState()
 
     var showAuthToast by remember { mutableStateOf(false) }
@@ -156,13 +166,6 @@ fun FeedScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(
-            isDark = themeState.isDark,
-            onThemeToggle = { themeViewModel.toggleDark() },
-            onSearchClick = onSearchClick,
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
         if (uiState.isSearchActive) {
             // Search banner
             Row(
@@ -177,16 +180,9 @@ fun FeedScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { viewModel.clearSearch() }, modifier = Modifier.size(32.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Clear search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp),
-                    )
-                }
+                TerminalIconButton(Icons.Default.Close, "Clear search", buttonSize = 32.dp, iconSize = 14.dp) { viewModel.clearSearch() }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
         } else {
             // Active filter banner
             if (uiState.activeCategoryFilters.isNotEmpty()) {
@@ -202,16 +198,9 @@ fun FeedScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = { onClearFilter() }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Clear filter",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
+                    TerminalIconButton(Icons.Default.Close, "Clear filter", buttonSize = 32.dp, iconSize = 14.dp) { onClearFilter() }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
             }
 
             if (uiState.activeBlogFilter != null) {
@@ -227,72 +216,65 @@ fun FeedScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = { onClearBlogFilter() }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Clear source filter",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
+                    TerminalIconButton(Icons.Default.Close, "Clear source filter", buttonSize = 32.dp, iconSize = 14.dp) { onClearBlogFilter() }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
             }
 
             // Sort row
             Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val labelSmall = MaterialTheme.typography.labelSmall
-            val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-            val primaryColor = MaterialTheme.colorScheme.primary
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val labelSmall = MaterialTheme.typography.labelSmall
+                val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+                val primaryColor = MaterialTheme.colorScheme.primary
 
-            val annotatedText = remember(uiState.sortOrder, labelSmall, onSurfaceVariant, primaryColor) {
-                buildAnnotatedString {
-                    withStyle(
-                        style = SpanStyle(
-                            fontSize = labelSmall.fontSize,
-                            fontWeight = labelSmall.fontWeight,
-                            fontFamily = labelSmall.fontFamily,
-                            letterSpacing = labelSmall.letterSpacing
-                        )
-                    ) {
+                val annotatedText = remember(uiState.sortOrder, labelSmall, onSurfaceVariant, primaryColor) {
+                    buildAnnotatedString {
                         withStyle(
                             style = SpanStyle(
-                                color = onSurfaceVariant,
+                                fontSize = labelSmall.fontSize,
+                                fontWeight = labelSmall.fontWeight,
+                                fontFamily = labelSmall.fontFamily,
+                                letterSpacing = labelSmall.letterSpacing
                             )
                         ) {
-                            append("//sorted by ")
-                        }
-                        withStyle(
-                            style = SpanStyle(
-                                color = primaryColor
-                            )
-                        ) {
-                            append(if (uiState.sortOrder == SortOrder.NEWEST) "↓ newest" else "↑ trending")
+                            withStyle(
+                                style = SpanStyle(
+                                    color = onSurfaceVariant,
+                                )
+                            ) {
+                                append("//sorted by ")
+                            }
+                            withStyle(
+                                style = SpanStyle(
+                                    color = primaryColor
+                                )
+                            ) {
+                                append(if (uiState.sortOrder == SortOrder.NEWEST) "↓ newest" else "↑ trending")
+                            }
                         }
                     }
                 }
+                Text(
+                    text = annotatedText,
+                    modifier = Modifier
+                        .clickable {
+                            viewModel.toggleSort()
+                        }
+                        .padding(4.dp),
+                )
+                Text(
+                    text = "${uiState.articles.size} articles",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Text(
-                text = annotatedText,
-                modifier = Modifier
-                    .clickable {
-                        viewModel.toggleSort()
-                    }
-                    .padding(4.dp),
-            )
-            Text(
-                text = "${uiState.articles.size} articles",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
         } // end else (not search active)
 
         // Error
@@ -317,7 +299,7 @@ fun FeedScreen(
                     modifier = Modifier.fillMaxWidth(0.6f),
                 )
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
         }
 
         when {
@@ -371,8 +353,13 @@ fun FeedScreen(
                                 onArticleClick = onArticleClicked,
                                 onSaveClick = onSaveClicked,
                                 isSaving = article.id in savingArticles,
+                                style = feedStyle,
                             )
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                            TerminalDivider()
+                            // Big previews sit right against the rule otherwise; give them room.
+                            if (feedStyle == FeedStyle.BIG_THUMBNAILS) {
+                                Spacer(Modifier.height(8.dp))
+                            }
                         }
                         if (uiState.isLoadingMore) {
                             item(contentType = "loader") {
@@ -446,4 +433,48 @@ fun FeedScreen(
         )
     }
 }
+}
+
+@Composable
+private fun FeedStyleMenu(selected: FeedStyle, onSelect: (FeedStyle) -> Unit) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        TerminalIconButton(computer, "Feed Style") { menuOpen = true }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            FeedStyle.entries.forEachIndexed { index, style ->
+                if (index > 0) TerminalDivider()
+                FeedStyleItem(style, isSelected = style == selected) {
+                    onSelect(style)
+                    menuOpen = false
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedStyleItem(style: FeedStyle, isSelected: Boolean, onClick: () -> Unit) {
+    val color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    DropdownMenuItem(
+        text = { Text(style.label, style = MaterialTheme.typography.bodyMedium, color = color) },
+        leadingIcon = {
+            Icon(
+                imageVector = style.icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        },
+        trailingIcon = if (isSelected) {
+            {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        } else null,
+        onClick = onClick,
+    )
 }

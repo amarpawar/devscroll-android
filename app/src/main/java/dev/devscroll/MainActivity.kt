@@ -4,24 +4,27 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.navigation.NavBackStackEntry
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,14 +32,16 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
+import dev.devscroll.data.local.AuthPreferences
 import dev.devscroll.navigation.Screen
 import dev.devscroll.ui.components.BottomNavBar
-import dev.devscroll.data.local.AuthPreferences
-import dev.devscroll.data.model.User
-import androidx.hilt.navigation.compose.hiltViewModel
+import dev.devscroll.ui.components.TerminalDivider
+import dev.devscroll.ui.components.LocalTopBarActions
+import dev.devscroll.ui.components.TopBar
+import dev.devscroll.ui.components.TopBarActionsRegistry
+import dev.devscroll.ui.contact.ContactScreen
 import dev.devscroll.ui.feed.FeedScreen
 import dev.devscroll.ui.feed.FeedViewModel
-import dev.devscroll.ui.contact.ContactScreen
 import dev.devscroll.ui.profile.ProfileScreen
 import dev.devscroll.ui.reader.ReaderScreen
 import dev.devscroll.ui.saved.SavedScreen
@@ -45,6 +50,7 @@ import dev.devscroll.ui.sources.SourcesScreen
 import dev.devscroll.ui.theme.DevscrollTheme
 import dev.devscroll.ui.theme.ThemePreferences
 import dev.devscroll.ui.theme.ThemeState
+import dev.devscroll.ui.theme.ThemeViewModel
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -60,6 +66,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeState by themePreferences.themeState.collectAsState(initial = ThemeState())
             val userState by authPreferences.user.collectAsState(initial = null)
+            val themeViewModel: ThemeViewModel = hiltViewModel()
             DevscrollTheme(
                 darkTheme = themeState.isDark,
                 accentColor = themeState.accentColor,
@@ -68,10 +75,25 @@ class MainActivity : ComponentActivity() {
                 val currentEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = currentEntry?.destination?.route
 
-                var feedTabClickTrigger by remember { androidx.compose.runtime.mutableStateOf(0L) }
-                var savedTabClickTrigger by remember { androidx.compose.runtime.mutableStateOf(0L) }
+                var feedTabClickTrigger by remember { mutableLongStateOf(0L) }
+                var savedTabClickTrigger by remember { mutableLongStateOf(0L) }
+                val topBarActions = remember { TopBarActionsRegistry() }
 
+                CompositionLocalProvider(LocalTopBarActions provides topBarActions) {
                 Scaffold(
+                    topBar = {
+                        if (currentRoute in Screen.topBarRoutes) {
+                            Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
+                                TopBar(
+                                    isDark = themeState.isDark,
+                                    onThemeToggle = { themeViewModel.toggleDark() },
+                                    screenLabel = currentRoute,
+                                    actions = { topBarActions.Render(currentEntry?.id) },
+                                )
+                                TerminalDivider()
+                            }
+                        }
+                    },
                     bottomBar = {
                         if (currentRoute in Screen.bottomNavRoutes) {
                             BottomNavBar(
@@ -234,7 +256,6 @@ class MainActivity : ComponentActivity() {
                             FeedScreen(
                                 viewModel = feedViewModel,
                                 onArticleClick = { id -> navController.navigate(Screen.reader(id)) },
-                                onSearchClick = { navController.navigate(Screen.SEARCH) },
                                 onClearFilter = {
                                     feedViewModel.clearFilter()
                                     backStackEntry.savedStateHandle["filter_tags"] = arrayListOf<String>()
@@ -251,6 +272,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 tabClickTrigger = feedTabClickTrigger,
+                                onSearchClick = { navController.navigate(Screen.SEARCH) },
                             )
                         }
                         composable(Screen.SAVED) {
@@ -268,7 +290,6 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.SOURCES) {
                             SourcesScreen(
-                                onSearchClick = { navController.navigate(Screen.SEARCH) },
                                 onSignInClick = {
                                     navController.navigate(Screen.PROFILE) {
                                         popUpTo(Screen.FEED) { saveState = true }
@@ -334,6 +355,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                }
                 }
             }
         }

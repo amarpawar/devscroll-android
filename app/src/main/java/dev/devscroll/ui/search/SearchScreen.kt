@@ -22,9 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,6 +65,8 @@ import dev.devscroll.ui.components.TagChip
 import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalToast
 import kotlin.time.Duration.Companion.milliseconds
+import dev.devscroll.ui.components.TerminalDivider
+import dev.devscroll.ui.components.TerminalIconButton
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -142,14 +141,7 @@ fun SearchScreen(
                 .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = { handleBack() }, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            TerminalIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back") { handleBack() }
             Text(
                 text = "$",
                 style = MaterialTheme.typography.bodyMedium,
@@ -189,17 +181,10 @@ fun SearchScreen(
                 },
             )
             if (query.isNotBlank()) {
-                IconButton(onClick = { viewModel.updateQuery("") }, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Clear",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                TerminalIconButton(Icons.Default.Close, "Clear", buttonSize = 36.dp, iconSize = 16.dp) { viewModel.updateQuery("") }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        TerminalDivider()
 
         if (isIdle) {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -239,7 +224,7 @@ fun SearchScreen(
                         }
                     }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
 
                 if (isLoadingSources || sources.isNotEmpty()) {
                     Text(
@@ -283,7 +268,7 @@ fun SearchScreen(
                                 )
                             }
                         }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                        TerminalDivider()
                     }
                 }
             }
@@ -295,7 +280,7 @@ fun SearchScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
             }
             LazyColumn {
                 items(
@@ -309,7 +294,7 @@ fun SearchScreen(
                         onSaveClick = onSaveClicked,
                         isSaving = article.id in savingArticles,
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    TerminalDivider()
                 }
             }
         }

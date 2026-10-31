@@ -16,10 +16,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
-enum class SourceSort {
-    DEFAULT, NAME, POSTS
-}
-
 @HiltViewModel
 class SourcesViewModel @Inject constructor(
     private val repository: ArticleRepository,
@@ -48,30 +44,41 @@ class SourcesViewModel @Inject constructor(
             initialValue = null,
         )
 
-    private val _sortType = MutableStateFlow(SourceSort.DEFAULT)
-    val sortType: StateFlow<SourceSort> = _sortType
+    private val _isSearchOpen = MutableStateFlow(false)
+    val isSearchOpen: StateFlow<Boolean> = _isSearchOpen.asStateFlow()
 
-    val sources: StateFlow<List<Source>> = combine(
-        repository.observeSources(),
-        _sortType
-    ) { list, sort ->
-        when (sort) {
-            SourceSort.DEFAULT -> list
-            SourceSort.NAME -> list.sortedBy { it.blogName.lowercase() }
-            SourceSort.POSTS -> list.sortedByDescending { it.articleCount }
-        }
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query.asStateFlow()
+
+    val sources: StateFlow<List<Source>> = repository.observeSources()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
+    /** [sources] narrowed by [query]; matches on blog name or url. */
+    val visibleSources: StateFlow<List<Source>> = combine(sources, _query) { list, query ->
+        val q = query.trim()
+        if (q.isEmpty()) list
+        else list.filter { it.blogName.contains(q, ignoreCase = true) || it.url.contains(q, ignoreCase = true) }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList(),
     )
 
-    fun toggleSort() {
-        _sortType.value = when (_sortType.value) {
-            SourceSort.DEFAULT -> SourceSort.NAME
-            SourceSort.NAME -> SourceSort.POSTS
-            SourceSort.POSTS -> SourceSort.DEFAULT
-        }
+    fun toggleSearch() {
+        if (_isSearchOpen.value) closeSearch() else _isSearchOpen.value = true
+    }
+
+    fun closeSearch() {
+        _isSearchOpen.value = false
+        _query.value = ""
+    }
+
+    fun updateQuery(query: String) {
+        _query.value = query
     }
 
     fun toggleSubscribe(blogId: Long) {

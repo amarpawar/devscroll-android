@@ -1,20 +1,21 @@
 package dev.devscroll.ui.sources
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.draw.shadow
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -33,14 +34,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.RssFeed
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,10 +50,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,8 +69,12 @@ import dev.devscroll.ui.components.BlinkingEmptyState
 import dev.devscroll.ui.components.SourceBadge
 import dev.devscroll.ui.components.TerminalLoader
 import dev.devscroll.ui.components.TerminalToast
-import dev.devscroll.ui.theme.ThemeViewModel
 import kotlin.time.Duration.Companion.milliseconds
+import dev.devscroll.ui.components.TerminalDivider
+import dev.devscroll.ui.components.TerminalIconButton
+import dev.devscroll.ui.components.BracketButton
+import dev.devscroll.ui.components.TopBarActions
+import androidx.compose.material.icons.filled.Search
 
 fun Modifier.dashedBorder(color: Color, width: Dp = 1.dp, cornerRadius: Dp = 4.dp) = drawBehind {
     val stroke = Stroke(
@@ -87,14 +91,26 @@ fun Modifier.dashedBorder(color: Color, width: Dp = 1.dp, cornerRadius: Dp = 4.d
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SourcesScreen(
-    onSearchClick: () -> Unit = {},
     onSignInClick: () -> Unit = {},
     viewModel: SourcesViewModel = hiltViewModel(),
-    themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
+    TopBarActions {
+        TerminalIconButton(Icons.Default.Search, "Search sources") { viewModel.toggleSearch() }
+    }
+
     val sources by viewModel.sources.collectAsState()
-    val themeState by themeViewModel.themeState.collectAsState()
+    val visibleSources by viewModel.visibleSources.collectAsState()
+    val isSearchOpen by viewModel.isSearchOpen.collectAsState()
+    val query by viewModel.query.collectAsState()
     val user by viewModel.userState.collectAsState()
+
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    BackHandler(enabled = isSearchOpen) { viewModel.closeSearch() }
+    LaunchedEffect(isSearchOpen) {
+        if (isSearchOpen) focusRequester.requestFocus()
+    }
 
     var showAuthToast by remember { mutableStateOf(false) }
 
@@ -105,66 +121,55 @@ fun SourcesScreen(
         }
     }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "cursor")
-    val cursorAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 530, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "cursorAlpha",
-    )
-
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Custom Terminal Header matching the screenshot
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            AnimatedVisibility(
+                visible = isSearchOpen,
+                enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(200)) + fadeOut(tween(200)),
             ) {
-                Text(
-                    text = "> sources",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold,
-                )
-                Box(
-                    modifier = Modifier
-                        .padding(start = 6.dp)
-                        .size(width = 8.dp, height = 16.dp)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .graphicsLayer { alpha = cursorAlpha }
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = { viewModel.toggleSort() }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.SwapVert,
-                        contentDescription = "Sort",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                IconButton(onClick = onSearchClick, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                IconButton(onClick = { themeViewModel.toggleDark() }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        imageVector = if (themeState.isDark) Icons.Default.WbSunny else Icons.Default.DarkMode,
-                        contentDescription = "Toggle theme",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "$",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        BasicTextField(
+                            value = query,
+                            onValueChange = { viewModel.updateQuery(it) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onBackground,
+                            ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                            decorationBox = { innerTextField ->
+                                if (query.isEmpty()) {
+                                    Text(
+                                        text = "grep sources…",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                innerTextField()
+                            },
+                        )
+                        TerminalIconButton(Icons.Default.Close, "Close search", buttonSize = 36.dp, iconSize = 16.dp) { viewModel.closeSearch() }
+                    }
+                    TerminalDivider()
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
             // User Status / Auth Panel (dashed border placeholder)
             Row(
@@ -204,15 +209,7 @@ fun SourcesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(
-                        text = "[ sign in ]",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .clickable { onSignInClick() }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+                    BracketButton("sign in") { onSignInClick() }
                 } else {
                     Box(
                         modifier = Modifier
@@ -244,18 +241,10 @@ fun SourcesScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(
-                        text = "[ profile ]",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .clickable { onSignInClick() }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+                    BracketButton("profile") { onSignInClick() }
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
 
             // Subscription Status Bar (e.g. // 12 of 12 subscribed | auto-poll 15m)
             val totalCount = sources.size
@@ -290,7 +279,7 @@ fun SourcesScreen(
                     )
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            TerminalDivider()
 
             val isRefreshing by viewModel.isRefreshing.collectAsState()
 
@@ -306,7 +295,7 @@ fun SourcesScreen(
                         modifier = Modifier.fillMaxWidth(0.6f),
                     )
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                TerminalDivider()
             }
 
             when {
@@ -339,6 +328,16 @@ fun SourcesScreen(
                         }
                     }
                 }
+                visibleSources.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        BlinkingEmptyState("no sources match \"${query.trim()}\"")
+                    }
+                }
                 else -> {
                     PullToRefreshBox(
                         isRefreshing = isRefreshing,
@@ -347,7 +346,7 @@ fun SourcesScreen(
                         indicator = {},
                     ) {
                         LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(sources, key = { it.blogId }) { source ->
+                            items(visibleSources, key = { it.blogId }) { source ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -411,7 +410,7 @@ fun SourcesScreen(
                                         )
                                     }
                                 }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                                TerminalDivider()
                             }
                         }
                     }

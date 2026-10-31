@@ -1,5 +1,6 @@
 package dev.devscroll.data.remote.dto
 
+import androidx.core.text.HtmlCompat
 import dev.devscroll.BuildConfig
 import dev.devscroll.data.local.entity.ArticleEntity
 import dev.devscroll.data.local.entity.SavedArticleEntity
@@ -43,6 +44,14 @@ private fun isoFormat() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).a
     timeZone = TimeZone.getTimeZone("UTC")
 }
 
+/**
+ * The API passes feed text through with HTML entities intact (e.g. `&#8217;` for ’), so decode
+ * them before the text reaches the database. Skips the parse when there's nothing to decode.
+ */
+private fun String.decodeHtmlEntities(): String =
+    if ('&' !in this) this
+    else HtmlCompat.fromHtml(this, HtmlCompat.FROM_HTML_MODE_LEGACY).toString().trim()
+
 private fun getFullThumbnailUrl(thumbnail: String?): String? {
     if (thumbnail == null) return null
     if (thumbnail.startsWith("http://", ignoreCase = true) || 
@@ -56,16 +65,16 @@ fun ArticleDto.toEntity(isRead: Boolean = false, isSaved: Boolean = false): Arti
     val publishedMillis = parsedPublishedMillis()
     return ArticleEntity(
         articleId = articleId,
-        authors = authors,
+        authors = authors.map { it.decodeHtmlEntities() },
         blogId = blogId,
-        blogName = blogName,
+        blogName = blogName.decodeHtmlEntities(),
         categories = categories.map { it.slug },
-        description = description,
+        description = description.decodeHtmlEntities(),
         hitCount = hitCount,
         publishedOn = publishedMillis,
         readMinutes = readMinutes,
         thumbnailUrl = getFullThumbnailUrl(thumbnailUrl),
-        title = title,
+        title = title.decodeHtmlEntities(),
         url = url,
         isRead = isRead,
         isSaved = isSaved,
@@ -74,32 +83,32 @@ fun ArticleDto.toEntity(isRead: Boolean = false, isSaved: Boolean = false): Arti
 
 fun ArticleDto.toSavedEntity(savedAt: Long = System.currentTimeMillis()) = SavedArticleEntity(
     articleId = articleId,
-    authors = authors,
+    authors = authors.map { it.decodeHtmlEntities() },
     blogId = blogId,
-    blogName = blogName,
+    blogName = blogName.decodeHtmlEntities(),
     categories = categories.map { it.slug },
-    description = description,
+    description = description.decodeHtmlEntities(),
     hitCount = hitCount,
     publishedOn = parsedPublishedMillis(),
     readMinutes = readMinutes,
     thumbnailUrl = getFullThumbnailUrl(thumbnailUrl),
-    title = title,
+    title = title.decodeHtmlEntities(),
     url = url,
     savedAt = savedAt,
 )
 
 fun ArticleDto.toSearchEntity(isRead: Boolean = false, isSaved: Boolean = false) = SearchArticleEntity(
     articleId = articleId,
-    authors = authors,
+    authors = authors.map { it.decodeHtmlEntities() },
     blogId = blogId,
-    blogName = blogName,
+    blogName = blogName.decodeHtmlEntities(),
     categories = categories.map { it.slug },
-    description = description,
+    description = description.decodeHtmlEntities(),
     hitCount = hitCount,
     publishedOn = parsedPublishedMillis(),
     readMinutes = readMinutes,
     thumbnailUrl = getFullThumbnailUrl(thumbnailUrl),
-    title = title,
+    title = title.decodeHtmlEntities(),
     url = url,
     isRead = isRead,
     isSaved = isSaved,

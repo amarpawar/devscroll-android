@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import dev.devscroll.ui.PaginationConfig
+import dev.devscroll.ui.components.FeedStyle
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import javax.inject.Inject
 
@@ -57,7 +58,20 @@ private data class LoadState(
 class FeedViewModel @Inject constructor(
     private val repository: ArticleRepository,
     private val authRepository: AuthRepository,
+    private val feedPreferences: FeedPreferences,
 ) : ViewModel() {
+
+    // Eager so the stored style is usually loaded before the first articles arrive.
+    val feedStyle: StateFlow<FeedStyle> = feedPreferences.feedStyle
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = FeedPreferences.DEFAULT_FEED_STYLE,
+        )
+
+    fun setFeedStyle(style: FeedStyle) {
+        viewModelScope.launch { feedPreferences.setFeedStyle(style) }
+    }
 
     val userState: StateFlow<User?> = authRepository.userState
         .stateIn(
