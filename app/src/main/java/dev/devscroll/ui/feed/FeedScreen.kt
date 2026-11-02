@@ -17,8 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -356,10 +354,6 @@ fun FeedScreen(
                                 style = feedStyle,
                             )
                             TerminalDivider()
-                            // Big previews sit right against the rule otherwise; give them room.
-                            if (feedStyle == FeedStyle.BIG_THUMBNAILS) {
-                                Spacer(Modifier.height(8.dp))
-                            }
                         }
                         if (uiState.isLoadingMore) {
                             item(contentType = "loader") {
@@ -465,16 +459,16 @@ private fun FeedStyleItem(style: FeedStyle, isSelected: Boolean, onClick: () -> 
                 modifier = Modifier.size(20.dp),
             )
         },
-        trailingIcon = if (isSelected) {
-            {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-            }
-        } else null,
+        // Every item keeps the trailing slot, dot or not. Otherwise the slot only exists on the
+        // selected row, and the menu's width changes with which row that is.
+        trailingIcon = {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .then(if (isSelected) Modifier.background(MaterialTheme.colorScheme.primary) else Modifier),
+            )
+        },
         onClick = onClick,
     )
 }

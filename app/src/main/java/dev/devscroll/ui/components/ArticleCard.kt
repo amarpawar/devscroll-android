@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -95,15 +96,15 @@ fun ArticleCard(
             .alpha(if (article.isRead) 0.6f else 1f)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        if (resolved == FeedStyle.BIG_THUMBNAILS) {
-            HotThumbnail(article = article)
-            Spacer(Modifier.height(12.dp))
-        }
-
         // The big preview carries its own HOT badge, so the inline tag would be redundant there.
         MetaRow(article, showHotTag = resolved != FeedStyle.BIG_THUMBNAILS)
 
         Spacer(Modifier.height(8.dp))
+
+        if (resolved == FeedStyle.BIG_THUMBNAILS) {
+            HotThumbnail(article = article)
+            Spacer(Modifier.height(12.dp))
+        }
 
         when (resolved) {
             FeedStyle.BIG_THUMBNAILS -> {
@@ -342,7 +343,7 @@ private fun HotThumbnail(article: Article) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .aspectRatio(16f / 9f)
             .border(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         if (article.thumbnailUrl != null) {
@@ -405,13 +406,6 @@ private fun HotThumbnailOverlay(article: Article) {
             .fillMaxSize()
             .padding(10.dp)
     ) {
-        Text(
-            text = "// preview",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            modifier = Modifier.align(Alignment.TopStart)
-        )
-
         // The big layout is used for every article when picked from the feed menu,
         // so the badge only shows for articles that are actually hot.
         if (article.isHot) {
@@ -430,14 +424,6 @@ private fun HotThumbnailOverlay(article: Article) {
                 )
             }
         }
-
-        val hexString = "0x" + article.id.toString(16).lowercase()
-        Text(
-            text = hexString,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.align(Alignment.BottomEnd)
-        )
     }
 }
 
