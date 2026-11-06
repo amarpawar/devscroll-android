@@ -94,10 +94,15 @@ fun ArticleCard(
             .fillMaxWidth()
             .clickable { onArticleClick(article) }
             .alpha(if (article.isRead) 0.6f else 1f)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(vertical = 12.dp),
     ) {
+        // Horizontal padding is applied per section so the big thumbnail can run edge to edge.
         // The big preview carries its own HOT badge, so the inline tag would be redundant there.
-        MetaRow(article, showHotTag = resolved != FeedStyle.BIG_THUMBNAILS)
+        MetaRow(
+            article = article,
+            showHotTag = resolved != FeedStyle.BIG_THUMBNAILS,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
 
         Spacer(Modifier.height(8.dp))
 
@@ -106,44 +111,50 @@ fun ArticleCard(
             Spacer(Modifier.height(12.dp))
         }
 
-        when (resolved) {
-            FeedStyle.BIG_THUMBNAILS -> {
-                ArticleTitle(article, MaterialTheme.typography.titleMedium, maxLines = 3)
-                ArticleDescription(article, maxLines = 2)
-            }
-            FeedStyle.SMALL_THUMBNAILS -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .align(Alignment.Top),
-                    ) {
-                        ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 3)
-                        ArticleDescription(article, maxLines = 3)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        ) {
+            when (resolved) {
+                FeedStyle.BIG_THUMBNAILS -> {
+                    ArticleTitle(article, MaterialTheme.typography.titleMedium, maxLines = 3)
+                    ArticleDescription(article, maxLines = 2)
+                }
+                FeedStyle.SMALL_THUMBNAILS -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .align(Alignment.Top),
+                        ) {
+                            ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 3)
+                            ArticleDescription(article, maxLines = 3)
+                        }
+                        SmallThumbnail(article)
                     }
-                    SmallThumbnail(article)
+                }
+                FeedStyle.TEXT_ONLY -> {
+                    ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 3)
+                    ArticleDescription(article, maxLines = 3)
+                }
+                FeedStyle.COMPACT_LIST -> {
+                    ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 2)
                 }
             }
-            FeedStyle.TEXT_ONLY -> {
-                ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 3)
-                ArticleDescription(article, maxLines = 3)
-            }
-            FeedStyle.COMPACT_LIST -> {
-                ArticleTitle(article, MaterialTheme.typography.titleSmall, maxLines = 2)
-            }
+
+            Spacer(Modifier.height(8.dp))
+
+            FooterRow(article, onSaveClick, isSaving)
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        FooterRow(article, onSaveClick, isSaving)
     }
 }
 
 /** Source badge, author, age and optional [HOT] tag, with the report button on the right. */
 @Composable
-private fun MetaRow(article: Article, showHotTag: Boolean) {
+private fun MetaRow(article: Article, showHotTag: Boolean, modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Nested row owns the weight so the author's own weight is measured against
@@ -344,7 +355,6 @@ private fun HotThumbnail(article: Article) {
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
-            .border(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         if (article.thumbnailUrl != null) {
             SubcomposeAsyncImage(

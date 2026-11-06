@@ -39,8 +39,8 @@ android {
         minSdk = 24
         targetSdk = 36
         // Must increase on every Play upload — duplicates are rejected.
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 6
+        versionName = "1.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
