@@ -42,8 +42,14 @@ fun Context.openUrl(url: String) {
  * mail clients only instead of every app that accepts text.
  */
 fun Context.sendEmail(address: String, subject: String = "", body: String = "") {
+    val query = buildList {
+        if (subject.isNotEmpty()) add("subject=${Uri.encode(subject)}")
+        if (body.isNotEmpty()) add("body=${Uri.encode(body)}")
+    }.joinToString("&")
+    val mailtoUri = if (query.isEmpty()) "mailto:$address" else "mailto:$address?$query"
+
     val intent = Intent(Intent.ACTION_SENDTO).apply {
-        data = "mailto:$address".toUri()
+        data = mailtoUri.toUri()
         putExtra(Intent.EXTRA_SUBJECT, subject)
         putExtra(Intent.EXTRA_TEXT, body)
     }
