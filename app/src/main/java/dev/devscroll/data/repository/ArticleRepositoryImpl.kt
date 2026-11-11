@@ -17,7 +17,6 @@ import dev.devscroll.data.remote.dto.toSavedEntity
 import dev.devscroll.data.remote.dto.toSearchEntity
 import dev.devscroll.util.CrashReporter
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow

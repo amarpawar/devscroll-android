@@ -1,6 +1,5 @@
 package dev.devscroll.ui.feed
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,8 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,18 +41,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import dev.devscroll.ui.components.ArticleCard
 import dev.devscroll.ui.components.FeedStyle
@@ -69,12 +59,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import dev.devscroll.ui.components.TerminalDivider
 import dev.devscroll.ui.components.TerminalIconButton
 import dev.devscroll.ui.components.TopBarActions
-import dev.devscroll.icons.computer
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.ui.graphics.vector.ImageVector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -433,7 +421,7 @@ fun FeedScreen(
 private fun FeedStyleMenu(selected: FeedStyle, onSelect: (FeedStyle) -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
-        TerminalIconButton(computer, "Feed Style") { menuOpen = true }
+        TerminalIconButton(selected.icon, "Feed Style") { menuOpen = true }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             FeedStyle.entries.forEachIndexed { index, style ->
                 if (index > 0) TerminalDivider()
