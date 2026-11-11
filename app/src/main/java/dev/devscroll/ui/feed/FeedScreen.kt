@@ -58,6 +58,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 import dev.devscroll.ui.components.TerminalDivider
 import dev.devscroll.ui.components.TerminalIconButton
+import dev.devscroll.ui.components.TerminalScrollTopButton
 import dev.devscroll.ui.components.TopBarActions
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
@@ -96,7 +97,12 @@ fun FeedScreen(
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    
+    val isScrolledFromTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        }
+    }
+
     val onArticleClicked = remember(viewModel, onArticleClick) {
         { article: dev.devscroll.data.model.Article ->
             viewModel.markRead(article.id)
@@ -379,6 +385,20 @@ fun FeedScreen(
                 }
             }
         }
+    }
+
+    // Scroll-to-top: hidden at the top of the feed, appears once the list is scrolled
+    AnimatedVisibility(
+        visible = isScrolledFromTop && uiState.articles.isNotEmpty() && !showAuthToast,
+        enter = fadeIn(animationSpec = tween(200)) + slideInVertically(initialOffsetY = { it / 2 }, animationSpec = tween(200)),
+        exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(targetOffsetY = { it / 2 }, animationSpec = tween(200)),
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(16.dp)
+    ) {
+        TerminalScrollTopButton(
+            onClick = { scope.launch { listState.animateScrollToItem(0) } }
+        )
     }
 
     // Dimming Scrim behind the toast
