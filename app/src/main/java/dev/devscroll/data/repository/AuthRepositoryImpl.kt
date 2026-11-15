@@ -37,12 +37,6 @@ class AuthRepositoryImpl @Inject constructor(
         fetchAndSaveProfile("google")
     }
 
-    override suspend fun signInWithFacebook(accessToken: String): Result<User> = authCall("facebook sign-in") {
-        val tokens = apiService.loginWithFacebook(FacebookSignInRequest(accessToken))
-        authPreferences.saveTokens(tokens)
-        fetchAndSaveProfile("facebook")
-    }
-
     override suspend fun signInWithEmail(email: String, pass: String): Result<User> = authCall("email sign-in") {
         val tokens = apiService.loginWithEmail(EmailSignInRequest(email, pass))
         authPreferences.saveTokens(tokens)

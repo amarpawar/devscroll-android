@@ -6,10 +6,6 @@ data class GoogleSignInRequest(
     @SerializedName("idToken") val idToken: String
 )
 
-data class FacebookSignInRequest(
-    @SerializedName("accessToken") val accessToken: String
-)
-
 data class EmailSignInRequest(
     @SerializedName("email") val email: String,
     @SerializedName("password") val password: String
@@ -39,8 +35,7 @@ data class ForgotPasswordRequest(
  */
 data class DeleteAccountRequest(
     @SerializedName("password") val password: String? = null,
-    @SerializedName("idToken") val idToken: String? = null,
-    @SerializedName("accessToken") val accessToken: String? = null,
+    @SerializedName("idToken") val idToken: String? = null
 )
 
 data class TokenPair(

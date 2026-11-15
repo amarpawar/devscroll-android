@@ -87,19 +87,6 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun loginWithFacebook(accessToken: String) {
-        viewModelScope.launch {
-            _localState.value = AuthUiState.Authenticating
-            authRepository.signInWithFacebook(accessToken)
-                .onSuccess {
-                    _localState.value = null
-                }
-                .onFailure { error ->
-                    _localState.value = AuthUiState.Error(error.message ?: "Facebook Sign-In failed")
-                }
-        }
-    }
-
     fun loginWithEmail(email: String, pass: String) {
         viewModelScope.launch {
             _localState.value = AuthUiState.Authenticating

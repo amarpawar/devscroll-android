@@ -1,8 +1,7 @@
 <resources>
     <string name="app_name">Devscroll</string>
     <!--
-      google_web_client_id, facebook_app_id, facebook_client_token and
-      facebook_login_protocol_scheme are generated from local.properties by
+      google_web_client_id is generated from local.properties by
       app/build.gradle.kts. See local.properties.example.
     -->
 </resources>

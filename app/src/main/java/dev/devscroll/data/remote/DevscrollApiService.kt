@@ -55,9 +55,6 @@ interface DevscrollApiService {
     @POST("devscroll/api/auth/google")
     suspend fun loginWithGoogle(@Body request: GoogleSignInRequest): TokenPair
 
-    @POST("devscroll/api/auth/facebook")
-    suspend fun loginWithFacebook(@Body request: FacebookSignInRequest): TokenPair
-
     /**
      * Always succeeds regardless of whether the account exists — the backend
      * deliberately avoids revealing which emails are registered.
