@@ -21,6 +21,13 @@ class InvalidCredentialException : Exception("Incorrect credentials — account 
 /** Carries a message the server wrote for the user, safe to display as-is. */
 class AuthFailureException(message: String) : Exception(message)
 
+enum class AuthOperation(val label: String, val unauthorizedMessage: String) {
+    GOOGLE_SIGN_IN("google sign-in", "Couldn't sign in with Google"),
+    EMAIL_SIGN_IN("email sign-in", "Incorrect email or password"),
+    EMAIL_SIGN_UP("email sign-up", "Couldn't create your account"),
+    FORGOT_PASSWORD("forgot password", "Couldn't reset your password")
+}
+
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val apiService: DevscrollApiService,
@@ -31,19 +38,19 @@ class AuthRepositoryImpl @Inject constructor(
 
     override val userState: Flow<User?> = authPreferences.user
 
-    override suspend fun signInWithGoogle(idToken: String): Result<User> = authCall("google sign-in") {
+    override suspend fun signInWithGoogle(idToken: String): Result<User> = authCall(AuthOperation.GOOGLE_SIGN_IN) {
         val tokens = apiService.loginWithGoogle(GoogleSignInRequest(idToken))
         authPreferences.saveTokens(tokens)
         fetchAndSaveProfile("google")
     }
 
-    override suspend fun signInWithEmail(email: String, pass: String): Result<User> = authCall("email sign-in") {
+    override suspend fun signInWithEmail(email: String, pass: String): Result<User> = authCall(AuthOperation.EMAIL_SIGN_IN) {
         val tokens = apiService.loginWithEmail(EmailSignInRequest(email, pass))
         authPreferences.saveTokens(tokens)
         fetchAndSaveProfile("username/password")
     }
 
-    override suspend fun signUpWithEmail(email: String, pass: String): Result<User> = authCall("email sign-up") {
+    override suspend fun signUpWithEmail(email: String, pass: String): Result<User> = authCall(AuthOperation.EMAIL_SIGN_UP) {
         val tokens = apiService.registerWithEmail(EmailSignUpRequest(email, pass))
         authPreferences.saveTokens(tokens)
         fetchAndSaveProfile("username/password")
@@ -54,19 +61,19 @@ class AuthRepositoryImpl @Inject constructor(
      * server's own ProblemDetail message, and reporting anything that isn't the user's
      * fault so it shows up in Crashlytics rather than only on their screen.
      */
-    private suspend fun <T> authCall(operation: String, block: suspend () -> T): Result<T> =
+    private suspend fun <T> authCall(operation: AuthOperation, block: suspend () -> T): Result<T> =
         runCatching { block() }.recoverCatching { error ->
             // runCatching swallows cancellation; letting it through would report a
             // non-fatal every time the user leaves the screen mid-request.
             if (error is CancellationException) throw error
             if (!error.isExpectedClientError()) {
-                crashReporter.recordNonFatal(error, "Auth failed: $operation")
+                crashReporter.recordNonFatal(error, "Auth failed: ${operation.label}")
             }
-            throw error.userFacingMessage()?.let(::AuthFailureException) ?: error
+            throw error.userFacingMessage(operation.unauthorizedMessage)?.let(::AuthFailureException) ?: error
         }
 
     override suspend fun forgotPassword(email: String): Result<Unit> =
-        authCall("forgot password") {
+        authCall(AuthOperation.FORGOT_PASSWORD) {
             val response = apiService.forgotPassword(ForgotPasswordRequest(email))
             if (!response.isSuccessful) {
                 throw IllegalStateException("Request failed (${response.code()})")
