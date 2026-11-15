@@ -1023,7 +1023,7 @@ private fun LoggedOutView(
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable {
                             if (isSignUp) {
-                                profileViewModel.signUpWithEmail(email, password)
+                                profileViewModel.signUpWithEmail(email, password, confirmPassword)
                             } else {
                                 profileViewModel.loginWithEmail(email, password)
                             }

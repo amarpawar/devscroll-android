@@ -100,7 +100,11 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun signUpWithEmail(email: String, pass: String) {
+    fun signUpWithEmail(email: String, pass: String, confirmPassword: String) {
+        if (pass != confirmPassword) {
+            _localState.value = AuthUiState.Error("Passwords don't match")
+            return
+        }
         viewModelScope.launch {
             _localState.value = AuthUiState.Authenticating
             authRepository.signUpWithEmail(email, pass)
