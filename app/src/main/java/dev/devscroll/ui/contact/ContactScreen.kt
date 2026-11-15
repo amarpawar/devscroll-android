@@ -19,14 +19,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.ClipData
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import dev.devscroll.navigation.ExternalLinks
 import dev.devscroll.navigation.openUrl
 import dev.devscroll.navigation.sendEmail
@@ -42,7 +45,8 @@ import dev.devscroll.ui.components.TerminalDivider
 @Composable
 fun ContactScreen() {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -117,8 +121,12 @@ fun ContactScreen() {
                         .weight(1f)
                         .border(1.dp, MaterialTheme.colorScheme.outline)
                         .clickable {
-                            clipboard.setText(AnnotatedString(ExternalLinks.SUPPORT_EMAIL))
-                            Toast.makeText(context, "Email address copied", Toast.LENGTH_SHORT).show()
+                            scope.launch {
+                                clipboard.setClipEntry(
+                                    ClipEntry(ClipData.newPlainText("Support email", ExternalLinks.SUPPORT_EMAIL))
+                                )
+                                Toast.makeText(context, "Email address copied", Toast.LENGTH_SHORT).show()
+                            }
                         }
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
