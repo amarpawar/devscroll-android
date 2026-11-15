@@ -24,7 +24,7 @@ data class ApiError(
  * Field-level validation messages win over the generic detail, since "Validation failed"
  * is no more useful than the status code it replaced.
  */
-fun Throwable.userFacingMessage(): String? {
+fun Throwable.userFacingMessage(unauthorizedMessage: String? = null): String? {
     val httpException = this as? HttpException ?: return null
     val problem = httpException.parseProblemDetail()
 
@@ -35,7 +35,7 @@ fun Throwable.userFacingMessage(): String? {
 
     // Fall back to something human when the body is missing or unparseable.
     return when (httpException.code()) {
-        401, 403 -> "Incorrect email or password"
+        401, 403 -> unauthorizedMessage
         409 -> "That email is already registered"
         in 500..599 -> "Server error — please try again"
         else -> null
