@@ -52,12 +52,16 @@ import dev.devscroll.ui.theme.ThemeViewModel
 import dev.devscroll.ui.theme.AccentColor
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalAutofillManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -83,6 +87,9 @@ fun ProfileScreen(
     profileViewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val authState by profileViewModel.uiState.collectAsState()
+    val autofillManager = LocalAutofillManager.current
+    // Hoisted above the `when` so it survives LoggedOutView leaving composition on success.
+    var commitAutofillOnLogin by remember { mutableStateOf(false) }
 
     when (val state = authState) {
         is AuthUiState.Loading -> {
@@ -98,6 +105,11 @@ fun ProfileScreen(
         }
         is AuthUiState.LoggedIn -> {
             LaunchedEffect(Unit) {
+                // Only email/password logins offer to save; a Google login would save a half-typed form.
+                if (commitAutofillOnLogin) {
+                    autofillManager?.commit()
+                    commitAutofillOnLogin = false
+                }
                 profileViewModel.refreshProfile()
             }
             LoggedInDashboard(
@@ -121,7 +133,11 @@ fun ProfileScreen(
                 errorMessage = (state as? AuthUiState.Error)?.message,
                 onClearError = { profileViewModel.clearError() },
                 onContactClick = onContactClick,
+                onAuthSubmit = { viaEmail -> commitAutofillOnLogin = viaEmail },
             )
+            if (state is AuthUiState.Error) {
+                LaunchedEffect(state) { autofillManager?.cancel() }
+            }
         }
     }
 }
@@ -710,6 +726,7 @@ private fun ForgotPasswordDialog(
                     placeholder = "you@dev.local",
                     keyboardType = KeyboardType.Email,
                     enabled = !isSending,
+                    contentType = ContentType.EmailAddress,
                 )
 
                 if (state is ForgotPasswordState.Error) {
@@ -772,6 +789,7 @@ private fun LoggedOutView(
     onClearError: (() -> Unit)? = null,
     isLoading: Boolean = false,
     onContactClick: () -> Unit = {},
+    onAuthSubmit: (viaEmail: Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -887,6 +905,7 @@ private fun LoggedOutView(
                 },
                 onClick = {
                     if (!isLoading) {
+                        onAuthSubmit(false)
                         coroutineScope.launch {
                             try {
                                 profileViewModel.loginWithGoogle(requestGoogleIdToken(context))
@@ -949,7 +968,8 @@ private fun LoggedOutView(
                 onValueChange = { email = it },
                 placeholder = "you@dev.local",
                 keyboardType = KeyboardType.Email,
-                enabled = !isLoading
+                enabled = !isLoading,
+                contentType = ContentType.EmailAddress,
             )
 
             // Password field
@@ -969,6 +989,7 @@ private fun LoggedOutView(
                         modifier = Modifier.clickable { if (!isLoading) showPassword = !showPassword },
                     )
                 },
+                contentType = if (isSignUp) ContentType.NewPassword else ContentType.Password,
             )
 
             if (isSignUp) {
@@ -988,6 +1009,7 @@ private fun LoggedOutView(
                             modifier = Modifier.clickable { if (!isLoading) showConfirmPassword = !showConfirmPassword },
                         )
                     },
+                    contentType = ContentType.NewPassword,
                 )
             } else {
                 Text(
@@ -1022,6 +1044,7 @@ private fun LoggedOutView(
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable {
+                            onAuthSubmit(true)
                             if (isSignUp) {
                                 profileViewModel.signUpWithEmail(email, password, confirmPassword)
                             } else {
@@ -1122,6 +1145,7 @@ private fun TerminalInputField(
     visualTransformation: VisualTransformation = VisualTransformation.None,
     enabled: Boolean = true,
     trailing: (@Composable () -> Unit)? = null,
+    contentType: ContentType? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
@@ -1145,7 +1169,7 @@ private fun TerminalInputField(
                 value = value,
                 onValueChange = onValueChange,
                 enabled = enabled,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).semantics { contentType?.let { this.contentType = it } },
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = if (enabled) MaterialTheme.colorScheme.onBackground
                             else MaterialTheme.colorScheme.onSurfaceVariant,
