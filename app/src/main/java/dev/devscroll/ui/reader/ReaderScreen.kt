@@ -239,7 +239,11 @@ fun ReaderScreen(
                 AndroidView(
                     factory = { context ->
                         WebView(context).apply {
-                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            // Opaque white, like a browser's default canvas. Pages that
+                            // don't set their own background (e.g. Mashable) would
+                            // otherwise show the dark app theme behind their dark text.
+                            // The loading overlay covers this until the page renders.
+                            setBackgroundColor(android.graphics.Color.WHITE)
                             webViewClient = object : WebViewClient() {
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
