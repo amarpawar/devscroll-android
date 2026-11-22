@@ -10,6 +10,7 @@ import dev.devscroll.data.local.entity.toDomain
 import dev.devscroll.data.local.entity.toSavedEntity as toSavedLocalEntity
 import dev.devscroll.data.model.Article
 import dev.devscroll.data.model.ArticlesPage
+import dev.devscroll.data.model.CursorPage
 import dev.devscroll.data.model.Source
 import dev.devscroll.data.remote.DevscrollApiService
 import dev.devscroll.data.remote.dto.toEntity
@@ -51,10 +52,10 @@ class ArticleRepositoryImpl @Inject constructor(
     override fun observeSources(): Flow<List<Source>> =
         blogDao.observeAll().map { list -> list.map { it.toDomain() } }
 
-    override suspend fun fetchArticles(page: Int, sortType: String, blogId: Long?): Result<ArticlesPage> =
+    override suspend fun fetchArticles(cursor: String?, sortType: String, blogId: Long?): Result<CursorPage> =
         runCatching {
             databaseInitializer.awaitReady()
-            val response = apiService.getArticles(page = page, sortType = sortType, blogId = blogId)
+            val response = apiService.getArticles(cursor = cursor, sortType = sortType, blogId = blogId)
             val blogEntities = response.articles.map { dto ->
                 BlogEntity(
                     blogId = dto.blogId,
@@ -76,7 +77,7 @@ class ArticleRepositoryImpl @Inject constructor(
                 )
             }
             articleDao.upsertAll(entities)
-            ArticlesPage(page = response.page, hasNext = response.hasNext, totalPages = response.totalPages)
+            CursorPage(hasNext = response.hasNext, nextCursor = response.nextCursor)
         }
 
     override suspend fun fetchSavedArticles(page: Int): Result<ArticlesPage> =
@@ -98,11 +99,11 @@ class ArticleRepositoryImpl @Inject constructor(
             ArticlesPage(page = response.page, hasNext = response.hasNext, totalPages = response.totalPages)
         }
 
-    override suspend fun search(query: String, page: Int): Result<ArticlesPage> =
+    override suspend fun search(query: String, cursor: String?): Result<CursorPage> =
         runCatching {
             databaseInitializer.awaitReady()
-            if (page == 0) searchArticleDao.clearAll()
-            val response = apiService.searchArticles(query = query, page = page)
+            if (cursor == null) searchArticleDao.clearAll()
+            val response = apiService.searchArticles(query = query, cursor = cursor)
             val blogEntities = response.articles.map { dto ->
                 BlogEntity(
                     blogId = dto.blogId,
@@ -124,7 +125,7 @@ class ArticleRepositoryImpl @Inject constructor(
                 )
             }
             searchArticleDao.upsertAll(entities)
-            ArticlesPage(page = response.page, hasNext = response.hasNext, totalPages = response.totalPages)
+            CursorPage(hasNext = response.hasNext, nextCursor = response.nextCursor)
         }
 
     override suspend fun clearSearchResults() = searchArticleDao.clearAll()

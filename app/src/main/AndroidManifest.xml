@@ -4,6 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Portrait lock implies this feature; optional so Play doesn't filter out tablets/desktop/XR. -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
+
     <application
         android:name=".DevscrollApplication"
         android:allowBackup="true"
