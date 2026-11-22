@@ -40,6 +40,13 @@ data class ArticlesPageDto(
     val totalPages: Int,
 )
 
+// Cursor-paginated response (feed, search); nextCursor is null on the last page.
+data class CursorPageDto(
+    val articles: List<ArticleDto>,
+    val hasNext: Boolean,
+    val nextCursor: String?,
+)
+
 private fun isoFormat() = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")
 }

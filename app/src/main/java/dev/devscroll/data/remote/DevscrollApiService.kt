@@ -15,11 +15,11 @@ interface DevscrollApiService {
 
     @GET("devscroll/api/articles")
     suspend fun getArticles(
-        @Query("page") page: Int,
+        @Query("cursor") cursor: String? = null,
         @Query("size") size: Int = 20,
         @Query("sortType") sortType: String = "NEWEST",
         @Query("blogId") blogId: Long? = null,
-    ): ArticlesPageDto
+    ): CursorPageDto
 
     @GET("devscroll/api/blog")
     suspend fun getBlogs(): List<BlogDto>
@@ -27,9 +27,9 @@ interface DevscrollApiService {
     @GET("devscroll/api/articles/search")
     suspend fun searchArticles(
         @Query("query") query: String,
-        @Query("page") page: Int = 0,
+        @Query("cursor") cursor: String? = null,
         @Query("pageSize") pageSize: Int = 20,
-    ): ArticlesPageDto
+    ): CursorPageDto
 
     @POST("devscroll/api/users/me/saved-articles/{article_id}")
     suspend fun saveArticle(@Path("article_id") articleId: Long)
